@@ -133,6 +133,60 @@ describe('SourcesImportService', () => {
     expect(sources.rows[1]).toMatchObject({ slug: 'nasa', defaultCategoryId: null, enabled: false });
   });
 
+  it('resolve a categoria pelo NOME do export OPML (com acento), nao so pelo slug', async () => {
+    const { sources, service, categories } = setup();
+    categories.rows.push(
+      makeCategory({ id: 'cat-space', slug: 'astronomia-espaco', name: 'Astronomia e Espaço' }),
+    );
+
+    const report = await service.importSources([
+      {
+        name: 'ZZZ NASA',
+        feedUrl: 'https://www.nasa.gov/feeds/iotd-feed/',
+        siteUrl: null,
+        categorySlug: 'Astronomia e Espaço', // e o que o export OPML grava em category="…"
+        enabled: true,
+      },
+    ]);
+
+    expect(report.imported).toBe(1);
+    expect(sources.rows[0]).toMatchObject({ slug: 'zzz-nasa', defaultCategoryId: 'cat-space' });
+  });
+
+  it('resolve categoria por nome sem acento/caixa (Tecnologia -> tecnologia)', async () => {
+    const { sources, service } = setup();
+
+    const report = await service.importSources([
+      {
+        name: 'Docker',
+        feedUrl: 'https://www.docker.com/blog/feed/',
+        siteUrl: null,
+        categorySlug: 'Tecnologia',
+        enabled: true,
+      },
+    ]);
+
+    expect(report.imported).toBe(1);
+    expect(sources.rows[0]).toMatchObject({ slug: 'docker', defaultCategoryId: 'cat-tech' });
+  });
+
+  it('categoria desconhecida cai para null (sem categoria), sem falhar', async () => {
+    const { sources, service } = setup();
+
+    const report = await service.importSources([
+      {
+        name: 'Qualquer',
+        feedUrl: 'https://qualquer.com/feed',
+        siteUrl: null,
+        categorySlug: 'Categoria Que Nao Existe',
+        enabled: true,
+      },
+    ]);
+
+    expect(report.imported).toBe(1);
+    expect(sources.rows[0]!.defaultCategoryId).toBeNull();
+  });
+
   it('ignora feed ja cadastrado, mesmo com host/case/barra diferentes', async () => {
     const { sources, service } = setup();
     sources.rows.push(makeSource({ id: 's0', slug: 'g1', feedUrl: 'https://G1.GLOBO.com/rss/g1/' }));

@@ -32,7 +32,12 @@ export class SourcesImportService {
     const [existing, categories] = await Promise.all([this.sources.list(), this.categories.list()]);
     const takenSlugs = new Set(existing.map((s) => s.slug));
     const takenUrls = new Set(existing.map((s) => canonicalizeUrl(s.feedUrl)));
+    // A categoria pode vir como slug (`tecnologia`) ou como NOME — que e o que o
+    // nosso export OPML (e a maioria dos leitores) grava no atributo `category`
+    // (`category="Astronomia e Espaço"`). Nomes sao unicos no banco, entao a
+    // comparacao normalizada (`slugify`) e deterministica.
     const categoryIdBySlug = new Map(categories.map((c) => [c.slug, c.id]));
+    const categoryIdByName = new Map(categories.map((c) => [slugify(c.name), c.id]));
 
     let imported = 0;
     const fileUrls = new Set<string>(); // dedup dentro do proprio arquivo (URL canonica)
@@ -50,7 +55,9 @@ export class SourcesImportService {
 
       const slug = uniqueSlug(slugify(candidate.name), takenSlugs);
       const categoryId = candidate.categorySlug
-        ? (categoryIdBySlug.get(candidate.categorySlug) ?? null)
+        ? (categoryIdBySlug.get(candidate.categorySlug) ??
+          categoryIdByName.get(slugify(candidate.categorySlug)) ??
+          null)
         : null;
 
       try {
