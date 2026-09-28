@@ -145,6 +145,54 @@ describe('fontes', () => {
   });
 });
 
+describe('GET /api/v1/sources/export', () => {
+  const oneSource = [
+    {
+      id: 's-1',
+      slug: 'g1',
+      name: 'G1 Globo',
+      feedUrl: 'https://g1.globo.com/rss/g1/',
+      siteUrl: 'https://g1.globo.com',
+      defaultCategoryId: null,
+      enabled: true,
+      etag: null,
+      lastModified: null,
+      lastFetchedAt: null,
+      lastStatus: 'ok',
+      lastError: null,
+      category: { id: 'c-1', slug: 'geral', name: 'Geral', color: null },
+      createdAt: new Date(),
+    },
+  ];
+
+  it('faz download em OPML por padrao', async () => {
+    container.sourcesRepository.list = async () => oneSource as never;
+
+    const response = await request(app).get('/api/v1/sources/export');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('text/x-opml');
+    expect(response.headers['content-disposition']).toContain('attachment; filename="satelite-sources-');
+    expect(response.text).toContain('<opml version="2.0">');
+    expect(response.text).toContain('type="rss"');
+    expect(response.text).toContain('xmlUrl="https://g1.globo.com/rss/g1/"');
+  });
+
+  it('gera JSON quando pedido', async () => {
+    const response = await request(app).get('/api/v1/sources/export?format=json');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(response.headers['content-disposition']).toContain('.json');
+    expect(response.body.data[0]).toMatchObject({ slug: 'g1', name: 'G1 Globo' });
+  });
+
+  it('rejeita formato desconhecido', async () => {
+    const response = await request(app).get('/api/v1/sources/export?format=csv');
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
 describe('rotas inexistentes', () => {
   it('404 padronizado', async () => {
     const response = await request(app).get('/api/v1/nao-existe');

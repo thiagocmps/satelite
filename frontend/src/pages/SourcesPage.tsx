@@ -57,15 +57,23 @@ export function SourcesPage() {
         title="Fontes"
         description="Feeds RSS/Atom monitorados. A ingestao roda por agendamento e tambem pode ser disparada aqui."
         action={
-          <button type="button" className="button button--primary" onClick={() => ingest.mutate({})} disabled={ingest.isPending}>
-            {ingest.isPending ? (
-              <>
-                <span className="spinner" aria-hidden="true" /> Ingerindo todas…
-              </>
-            ) : (
-              '⟳ Ingerir tudo'
-            )}
-          </button>
+          <>
+            <a className="button" href="/api/v1/sources/export?format=opml" title="Baixar lista de feeds (OPML - importavel em leitores de RSS)">
+              ⇩ OPML
+            </a>
+            <a className="button" href="/api/v1/sources/export?format=json" title="Baixar backup em JSON">
+              ⇩ JSON
+            </a>
+            <button type="button" className="button button--primary" onClick={() => ingest.mutate({})} disabled={ingest.isPending}>
+              {ingest.isPending ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Ingerindo todas…
+                </>
+              ) : (
+                '⟳ Ingerir tudo'
+              )}
+            </button>
+          </>
         }
       />
 

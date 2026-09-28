@@ -324,6 +324,39 @@ A palavra-chave é comparada sem acento e sem caixa; a mais longa vence.
 
 `lastStatus` é `ok`, `not_modified`, `error` ou `null` (nunca executada).
 
+### `GET /sources/export`
+
+Download de todas as fontes (ativas ou desativadas), para backup ou transferência.
+
+| Query    | Tipo              | Padrão  | Descrição                                              |
+| -------- | ----------------- | ------- | ------------------------------------------------------ |
+| `format` | `opml` \| `json`  | `opml`  | OPML para importar em leitores de RSS; JSON é o backup cru |
+
+Resposta com `Content-Disposition: attachment`, nome `satelite-sources-<data>.opml`/`.json`.
+
+```bash
+curl -o fontes.opml 'http://localhost:4000/api/v1/sources/export?format=opml'
+curl -o fontes.json 'http://localhost:4000/api/v1/sources/export?format=json'
+```
+
+OPML (padrão para assinaturas RSS — Feedly, Inoreader, Thunderbird…):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Satelite - fontes</title>
+    <dateCreated>Mon, 28 Sep 2026 18:00:00 GMT</dateCreated>
+  </head>
+  <body>
+    <outline type="rss" text="G1 Globo" title="G1 Globo" xmlUrl="https://g1.globo.com/rss/g1/" htmlUrl="https://g1.globo.com" category="Geral"/>
+  </body>
+</opml>
+```
+
+JSON: o mesmo payload de `GET /sources`, com todos os campos internos (`etag`, `lastStatus`, `enabled`…),
+envelopado em `{ "data": [...] }` para restaurar como backup. Formato desconhecido → `400 VALIDATION_ERROR`.
+
 ### `POST /sources` → `201`
 
 | Campo               | Regras                                     |

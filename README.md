@@ -274,6 +274,7 @@ Base: `/api/v1`. Respostas de sucesso usam `{ "data": ... }`; listas acrescentam
 | `POST` | `/categories/:id/rules`       | Adiciona palavra-chave                                  |
 | `DELETE`| `/categories/:id/rules/:ruleId` | Remove palavra-chave                                 |
 | `GET`  | `/sources`                    | Fontes cadastradas com saúde da última coleta           |
+| `GET`  | `/sources/export`             | Download das fontes: `?format=opml` (padrão) \| `json`  |
 | `POST` | `/sources`                    | Adiciona fonte                                          |
 | `PATCH`| `/sources/:id`                | Atualiza fonte (ex.: `enabled`)                          |
 | `DELETE`| `/sources/:id`               | Remove fonte                                            |

@@ -11,6 +11,9 @@ const feedUrl = z.url('informe uma URL valida de feed RSS/Atom');
 
 export const idParamsSchema = z.object({ id: z.uuid() });
 
+/** Formato do download de fontes. OPML e o padrao de listas RSS; JSON e o backup cru. */
+export const exportQuerySchema = z.object({ format: z.enum(['opml', 'json']).default('opml') });
+
 export const createSchema = z.object({
   slug,
   name: z.string().trim().min(2).max(80),
