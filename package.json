@@ -1,0 +1,22 @@
+{
+  "name": "satelite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agregador de noticias com ingestao via RSS, armazenamento em PostgreSQL e resumo por IA (OpenRouter)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "migrate": "npm run migrate --workspace backend"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

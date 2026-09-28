@@ -1,0 +1,12 @@
+# Contexto de build: raiz do repositorio
+# (o backend precisa de db/migrations, que vive fora de backend/).
+node_modules
+**/node_modules
+**/dist
+frontend
+.env
+.env.*
+*.log
+**/Dockerfile
+**/.dockerignore
+.git

@@ -1,0 +1,103 @@
+# =============================================================================
+# satelite - stack completa (Postgres + API + frontend)
+#
+#   cp .env.example .env     # ajuste OPENROUTER_API_KEY
+#   docker compose up --build
+#
+# O .env NAO e montado dentro dos containers: ele apenas preenche as variaveis
+# abaixo. Assim nenhum arquivo de credencial vira parte da imagem.
+# =============================================================================
+
+name: satelite
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-satelite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-satelite}
+      POSTGRES_DB: ${POSTGRES_DB:-satelite}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-satelite} -d ${POSTGRES_DB:-satelite}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+
+  # Job de uma vez: aplica as migrations e sai. O backend so sobe depois dele.
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ['node', 'dist/db/migrate.js']
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://${POSTGRES_USER:-satelite}:${POSTGRES_PASSWORD:-satelite}@db:5432/${POSTGRES_DB:-satelite}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-satelite}:${POSTGRES_PASSWORD:-satelite}@db:5432/${POSTGRES_DB:-satelite}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      APP_NAME: ${APP_NAME:-Satelite}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
+      SUMMARY_RATE_LIMIT_WINDOW_MS: ${SUMMARY_RATE_LIMIT_WINDOW_MS:-60000}
+      SUMMARY_RATE_LIMIT_MAX: ${SUMMARY_RATE_LIMIT_MAX:-10}
+      ENABLE_INGEST: ${ENABLE_INGEST:-true}
+      INGEST_CRON: ${INGEST_CRON:-*/15 * * * *}
+      INGEST_CONCURRENCY: ${INGEST_CONCURRENCY:-4}
+      INGEST_TIMEOUT_MS: ${INGEST_TIMEOUT_MS:-20000}
+      FEED_MAX_BYTES: ${FEED_MAX_BYTES:-8000000}
+      AI_PROVIDER: ${AI_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      AI_MODEL: ${AI_MODEL:-openrouter/free}
+      AI_FALLBACK_MODELS: ${AI_FALLBACK_MODELS:-}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-45000}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
+      AI_PROMPT_VERSION: ${AI_PROMPT_VERSION:-v1}
+      AI_LANGUAGE: ${AI_LANGUAGE:-pt-BR}
+      AI_MAX_CONTENT_CHARS: ${AI_MAX_CONTENT_CHARS:-4000}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
+      - '${BACKEND_PORT:-4000}:4000'
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${FRONTEND_PORT:-8080}:80'
+
+volumes:
+  pgdata:

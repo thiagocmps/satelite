@@ -1,0 +1,89 @@
+/* Design tokens: uma unica fonte de verdade para cores, espacos e tipografia.
+   Tema claro e escuro trocam pelos mesmos nomes. */
+
+:root {
+  color-scheme: light dark;
+
+  /* superficies */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #dfe3e9;
+  --border-strong: #c4cad3;
+
+  /* texto */
+  --text: #12161c;
+  --text-muted: #5b6675;
+  --text-faint: #8a94a3;
+
+  /* acao */
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-soft: #e5edff;
+  --on-accent: #ffffff;
+
+  /* semantica */
+  --danger: #b42318;
+  --danger-soft: #fee4e2;
+  --success: #067647;
+  --success-soft: #dcfae6;
+  --warning: #b54708;
+  --warning-soft: #fef0c7;
+  --ai: #6941c6;
+  --ai-soft: #f4ebff;
+
+  /* forma */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
+  --shadow: 0 4px 14px rgb(16 24 40 / 8%);
+  --shadow-lg: 0 12px 32px rgb(16 24 40 / 12%);
+
+  /* tipografia */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  /* espacamento */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  --maxw: 1180px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e13;
+    --surface: #141922;
+    --surface-2: #1b212b;
+    --border: #262e3a;
+    --border-strong: #38424f;
+
+    --text: #eef1f5;
+    --text-muted: #a3adba;
+    --text-faint: #74808f;
+
+    --accent: #6f9bff;
+    --accent-hover: #8fb2ff;
+    --accent-soft: #1b2740;
+    --on-accent: #08101f;
+
+    --danger: #fda29b;
+    --danger-soft: #3a1a18;
+    --success: #6ce9a6;
+    --success-soft: #10321f;
+    --warning: #fec84b;
+    --warning-soft: #3a2a0a;
+    --ai: #c3a4ff;
+    --ai-soft: #2a1f45;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow: 0 4px 14px rgb(0 0 0 / 45%);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
+  }
+}
