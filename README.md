@@ -275,6 +275,7 @@ Base: `/api/v1`. Respostas de sucesso usam `{ "data": ... }`; listas acrescentam
 | `DELETE`| `/categories/:id/rules/:ruleId` | Remove palavra-chave                                 |
 | `GET`  | `/sources`                    | Fontes cadastradas com saúde da última coleta           |
 | `GET`  | `/sources/export`             | Download das fontes: `?format=opml` (padrão) \| `json`  |
+| `POST` | `/sources/import`             | Importa fontes de um arquivo OPML ou JSON (aditivo)      |
 | `POST` | `/sources`                    | Adiciona fonte                                          |
 | `PATCH`| `/sources/:id`                | Atualiza fonte (ex.: `enabled`)                          |
 | `DELETE`| `/sources/:id`               | Remove fonte                                            |
@@ -371,6 +372,21 @@ silenciar o esquecimento.
 
 **Pela interface** (página *Fontes*): nome, slug (gerado se vazio), URL do feed, site e categoria
 padrão. Clique em **“Ingerir”** na linha para coletar na hora.
+
+**Importando um arquivo** (página *Fontes* → botão **“⇧ Importar”**, ou `POST /sources/import`):
+aceita **OPML** (o padrão de listas de RSS — exportável do Feedly, Inoreader etc., e também o
+formato exportado por esta própria interface) e **JSON** (o backup de `GET /sources/export`).
+O import é **aditivo**: só cadastra o que ainda não existe (comparando por URL canônica), gera
+slugs sem colidir e responde com um relatório do que entrou e do que foi ignorado (com motivo).
+
+```bash
+# restore do próprio backup
+curl -X POST http://localhost:4000/api/v1/sources/import -H 'content-type: text/xml' \
+  --data-binary @fontes.opml
+# formato JSON: um array ou { "data": [...] }
+curl -X POST http://localhost:4000/api/v1/sources/import -H 'content-type: application/json' \
+  --data-binary @fontes.json
+```
 
 **Pela API:**
 

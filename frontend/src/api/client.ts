@@ -55,6 +55,9 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
+  /** POST com corpo cru (arquivo lido como texto): content-type nao-JSON para o backend detectar OPML/JSON. */
+  postRaw: <T>(path: string, raw: string) =>
+    request<T>(path, { method: 'POST', body: raw, headers: { 'content-type': 'application/octet-stream' } }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };

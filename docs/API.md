@@ -357,6 +357,52 @@ OPML (padrão para assinaturas RSS — Feedly, Inoreader, Thunderbird…):
 JSON: o mesmo payload de `GET /sources`, com todos os campos internos (`etag`, `lastStatus`, `enabled`…),
 envelopado em `{ "data": [...] }` para restaurar como backup. Formato desconhecido → `400 VALIDATION_ERROR`.
 
+### `POST /sources/import`
+
+Import **aditivo** de fontes — contraparte do export; nunca altera fontes existentes.
+
+**Formato do corpo:** o conteúdo cru de um arquivo (`--data-binary`), ou o JSON já como objeto.
+Qualquer um dos dois é detectado pelo conteúdo:
+
+- **OPML** (XML começando com `<`): os `<outline … xmlUrl="…">`, em qualquer aninhamento, viram fontes.
+  Nome vem de `text`/`title` (fallback: host do feed); `htmlUrl` → site; `category` → categoria padrão.
+  Pastas sem `xmlUrl` são ignoradas.
+- **JSON**: um array ou `{ "data": [...] }` (o próprio export). Campos usados: `name`, `feedUrl`,
+  `siteUrl`, `enabled`, `categorySlug` (ou `category.slug`, embutido pelo export). Os demais são ignorados.
+
+Exemplos:
+
+```bash
+# OPML salvo pelo proprio export
+curl -X POST http://localhost:4000/api/v1/sources/import -H 'content-type: text/x-opml' \
+  --data-binary @fontes.opml
+
+# JSON do export
+curl -X POST http://localhost:4000/api/v1/sources/import -H 'content-type: application/json' \
+  --data-binary @fontes.json
+```
+
+**Comportamento** (relatório `{ data: { imported, skipped: [...] } }`):
+
+- Dedupe por **URL canônica** (host minúsculo, sem barra final/fragmento) contra o banco e dentro do próprio arquivo.
+- Slug derivado do nome com sufixo `-2`, `-3`… quando colidir — nunca falha por slug.
+- Categoria por slug quando existe localmente; senão fica sem padrão (não bloqueia).
+- Erros **por item** viram `skipped` com motivo (`URL invalida`, `feed ja cadastrado`, `slugs em conflito`);
+  uma entrada ruim não derruba o import.
+- Resposta `201` se algo foi importado, `200` se tudo foi ignorado. `400 VALIDATION_ERROR`
+  para corpo vazio, JSON malformado ou formato irreconhecível. Limite: 2 MB.
+
+```json
+{
+  "data": {
+    "imported": 1,
+    "skipped": [
+      { "name": "G1 Globo", "feedUrl": "https://g1.globo.com/rss/g1/", "reason": "feed ja cadastrado" }
+    ]
+  }
+}
+```
+
 ### `POST /sources` → `201`
 
 | Campo               | Regras                                     |

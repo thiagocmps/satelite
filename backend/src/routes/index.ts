@@ -39,7 +39,12 @@ export function createApiRouter(container: Container): Router {
   const newsController = createNewsController(container.news);
   const summariesController = createSummariesController(container.summaries);
   const categoriesController = createCategoriesController(container.categoriesRepository);
-  const sourcesController = createSourcesController(container.sourcesRepository, container.ingestion, env.APP_NAME);
+  const sourcesController = createSourcesController(
+    container.sourcesRepository,
+    container.ingestion,
+    env.APP_NAME,
+    container.categoriesRepository,
+  );
   const ingestionController = createIngestionController(container.ingestion, container.runsRepository);
 
   router.use(generalRateLimit(env.RATE_LIMIT_WINDOW_MS, env.RATE_LIMIT_MAX));

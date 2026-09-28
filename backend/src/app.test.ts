@@ -1,6 +1,6 @@
 import express, { type Express } from 'express';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import { createContainer } from './container.js';
 import { loadEnv } from './config/env.js';
@@ -188,6 +188,81 @@ describe('GET /api/v1/sources/export', () => {
 
   it('rejeita formato desconhecido', async () => {
     const response = await request(app).get('/api/v1/sources/export?format=csv');
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('POST /api/v1/sources/import', () => {
+  const originalList = container.sourcesRepository.list;
+  const originalCreate = container.sourcesRepository.create;
+  const originalCategoriesList = container.categoriesRepository.list;
+  const store: Array<Record<string, unknown>> = [];
+
+  beforeEach(() => {
+    store.length = 0;
+    container.sourcesRepository.list = async () => store as never;
+    container.sourcesRepository.create = async (input) => {
+      const record = { id: `s-${store.length + 1}`, ...input, createdAt: new Date(), category: null };
+      store.push(record);
+      return record as never;
+    };
+    container.categoriesRepository.list = async () =>
+      [
+        { id: 'cat-tech', slug: 'tecnologia', name: 'Tecnologia', description: null, color: null, articleCount: 0, createdAt: new Date() },
+      ] as never;
+  });
+
+  afterEach(() => {
+    container.sourcesRepository.list = originalList;
+    container.sourcesRepository.create = originalCreate;
+    container.categoriesRepository.list = originalCategoriesList;
+  });
+
+  it('importa OPML em corpo cru e responde 201 com relatorio', async () => {
+    const opml = `<?xml version="1.0"?>
+<opml version="2.0"><body>
+  <outline type="rss" text="Meu Feed" xmlUrl="https://meu.com/feed" htmlUrl="https://meu.com" category="tecnologia"/>
+</body></opml>`;
+
+    const response = await request(app).post('/api/v1/sources/import').set('content-type', 'text/xml').send(opml);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({ imported: 1, skipped: [] });
+    expect(store[0]!).toMatchObject({
+      slug: 'meu-feed',
+      feedUrl: 'https://meu.com/feed',
+      defaultCategoryId: 'cat-tech',
+    });
+  });
+
+  it('skips (sem erro) feed existente e duplicado dentro do proprio arquivo', async () => {
+    store.push({ id: 's0', slug: 'g1', name: 'G1', feedUrl: 'https://g1.globo.com/rss/g1/', enabled: true });
+    const opml = `<opml><body>
+      <outline type="rss" text="G1" xmlUrl="https://g1.globo.com/rss/g1/"/>
+      <outline type="rss" text="Repetido" xmlUrl="https://g1.globo.com/rss/g1/"/>
+    </body></opml>`;
+
+    const response = await request(app).post('/api/v1/sources/import').set('content-type', 'text/xml').send(opml);
+
+    expect(response.status).toBe(200); // nada importado
+    expect(response.body.data.imported).toBe(0);
+    expect(response.body.data.skipped).toHaveLength(2);
+  });
+
+  it('aceita o JSON do proprio export ({ data: [...] }) via application/json', async () => {
+    const response = await request(app)
+      .post('/api/v1/sources/import')
+      .set('content-type', 'application/json')
+      .send({ data: [{ slug: 'x', name: 'X', feedUrl: 'https://x.com/feed', enabled: false }] });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.imported).toBe(1);
+    expect(store[0]!).toMatchObject({ feedUrl: 'https://x.com/feed', enabled: false, slug: 'x' });
+  });
+
+  it('rejeita corpo de formato desconhecido', async () => {
+    const response = await request(app).post('/api/v1/sources/import').set('content-type', 'text/plain').send('banana');
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });

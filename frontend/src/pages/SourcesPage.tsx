@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState, ErrorBox } from '../components/States';
 import { suggestSlug } from '../components/Filters';
+import type { SourcesImportReport } from '../api/types';
 import {
   useCategories,
   useCreateSource,
   useDeleteSource,
+  useImportSources,
   useIngestNow,
   useIngestionRuns,
   useSources,
@@ -29,10 +31,35 @@ export function SourcesPage() {
   const updateSource = useUpdateSource();
   const deleteSource = useDeleteSource();
   const ingest = useIngestNow();
+  const importSources = useImportSources();
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({ name: '', slug: '', feedUrl: '', siteUrl: '', categoryId: '' });
+  const [importResult, setImportResult] = useState<SourcesImportReport | null>(null);
 
-  const error = sources.error ?? createSource.error ?? ingest.error ?? deleteSource.error;
+  const error =
+    sources.error ?? createSource.error ?? ingest.error ?? deleteSource.error ?? importSources.error;
+
+  function onImportFileSelected(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setImportResult({
+        imported: 0,
+        skipped: [{ name: file.name, feedUrl: '', reason: 'arquivo maior que 2 MB' }],
+      });
+      return;
+    }
+    setImportResult(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        importSources.mutate(reader.result, {
+          onSuccess: (response) => setImportResult(response.data),
+        });
+      }
+    };
+    reader.readAsText(file);
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -58,6 +85,27 @@ export function SourcesPage() {
         description="Feeds RSS/Atom monitorados. A ingestao roda por agendamento e tambem pode ser disparada aqui."
         action={
           <>
+            <input
+              ref={fileInput}
+              className="visually-hidden"
+              type="file"
+              accept=".opml,.xml,.json,text/xml,text/x-opml,application/json"
+              onChange={(event) => onImportFileSelected(event.target.files?.[0])}
+            />
+            <button
+              type="button"
+              className="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={importSources.isPending}
+            >
+              {importSources.isPending ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Importando…
+                </>
+              ) : (
+                '⇧ Importar'
+              )}
+            </button>
             <a className="button" href="/api/v1/sources/export?format=opml" title="Baixar lista de feeds (OPML - importavel em leitores de RSS)">
               ⇩ OPML
             </a>
@@ -82,6 +130,30 @@ export function SourcesPage() {
         <p className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }}>
           Ingestao concluida. Va em Noticias para ver os resultados.
         </p>
+      ) : null}
+
+      {importResult ? (
+        <div className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }} role="status">
+          <strong>
+            {importResult.imported > 0
+              ? `${importResult.imported} fonte${importResult.imported > 1 ? 's' : ''} importada${importResult.imported > 1 ? 's' : ''}.`
+              : 'Nenhuma fonte nova para importar.'}
+          </strong>
+          {importResult.skipped.length > 0 ? (
+            <ul style={{ margin: 'var(--sp-2) 0 0', paddingLeft: 'var(--sp-4)' }}>
+              {importResult.skipped.map((item) => (
+                <li key={`${item.feedUrl}-${item.reason}`} className="small">
+                  <strong>{item.name}</strong> — {item.reason}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {importResult.imported > 0 ? (
+            <p className="small" style={{ marginTop: 'var(--sp-2)' }}>
+              As novas fontes ainda nao coletaram noticias: use "Ingerir tudo" para buscar agora.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="stack">

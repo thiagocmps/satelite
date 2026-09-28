@@ -1,14 +1,23 @@
 import type { Request, Response } from 'express';
 import { NotFoundError } from '../../core/errors.js';
 import { valid } from '../../middleware/validate.middleware.js';
+import type { CategoriesRepository } from '../categories/categories.repository.js';
 import type { IngestionService } from '../ingestion/ingestion.service.js';
+import { parseImportBody } from './sources.import.js';
+import { SourcesImportService, type ImportReport } from './sources.import.service.js';
 import { buildOpml } from './sources.opml.js';
 import type { SourcesRepository } from './sources.repository.js';
 import type { SourceInput, SourcePatch } from './sources.types.js';
 
 const dateStamp = (): string => new Date().toISOString().slice(0, 10);
 
-export function createSourcesController(sources: SourcesRepository, ingestion: IngestionService, appName: string) {
+export function createSourcesController(
+  sources: SourcesRepository,
+  ingestion: IngestionService,
+  appName: string,
+  categories: CategoriesRepository,
+) {
+  const imports = new SourcesImportService(sources, categories);
   return {
     list: async (_req: Request, res: Response) => {
       res.json({ data: await sources.list() });
@@ -62,6 +71,16 @@ export function createSourcesController(sources: SourcesRepository, ingestion: I
         .setHeader('content-type', 'text/x-opml; charset=utf-8')
         .setHeader('content-disposition', `attachment; filename="satelite-sources-${dateStamp()}.opml"`)
         .send(xml);
+    },
+
+    /**
+     * Import aditivo de fontes. Aceita OPML (curl/leitores de RSS) ou JSON
+     * (o proprio export). O corpo chega como string (express.text) ou objeto
+     * (express.json); o parser detecta o formato sozinho.
+     */
+    importSources: async (req: Request, res: Response) => {
+      const report: ImportReport = await imports.importSources(parseImportBody(req.body));
+      res.status(report.imported > 0 ? 201 : 200).json({ data: report });
     },
 
     ingest: async (req: Request, res: Response) => {

@@ -9,6 +9,7 @@ import type {
   NewsFilters,
   Paginated,
   Source,
+  SourcesImportReport,
 } from './types';
 
 /* ------------------------------------------------------------------ noticias */
@@ -76,6 +77,11 @@ export function deleteSource(id: string): Promise<void> {
 
 export function ingestSourceNow(id: string): Promise<{ data: unknown }> {
   return api.post<{ data: unknown }>(`/sources/${id}/ingest`);
+}
+
+/** Import de fontes: corpo cru (conteudo de um arquivo OPML ou JSON). */
+export function importSources(raw: string): Promise<{ data: SourcesImportReport }> {
+  return api.postRaw<{ data: SourcesImportReport }>('/sources/import', raw);
 }
 
 /* ---------------------------------------------------------------- ingestao */

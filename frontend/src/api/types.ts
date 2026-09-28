@@ -107,6 +107,12 @@ export type IngestionRun = {
   finishedAt: string | null;
 };
 
+/** Resultado do import de fontes: o que entrou e o que foi ignorado (com motivo). */
+export type SourcesImportReport = {
+  imported: number;
+  skipped: Array<{ name: string; feedUrl: string; reason: string }>;
+};
+
 export type SourceIngestionResult = {
   sourceId: string;
   slug: string;

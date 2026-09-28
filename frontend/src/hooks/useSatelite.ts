@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api/satelite.api';
-import type { NewsFilters } from '../api/types';
+import type { NewsFilters, SourcesImportReport } from '../api/types';
 
 /**
  * Hooks = unico lugar do frontend que conhece a API. Componentes so consomem
@@ -127,6 +127,21 @@ export function useDeleteSource() {
   return useMutation({
     mutationFn: api.deleteSource,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: sourcesKeys.all }),
+  });
+}
+
+/** Import de fontes a partir de um arquivo OPML ou JSON (leitura do arquivo fica no componente). */
+export function useImportSources() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (raw: string) => api.importSources(raw),
+    onSuccess: (response: { data: SourcesImportReport }) => {
+      void queryClient.invalidateQueries({ queryKey: sourcesKeys.all });
+      void queryClient.invalidateQueries({ queryKey: sourcesKeys.runs });
+      // fontes novas ainda nao coletaram nada: o usuario pode disparar a ingestao
+      void queryClient.invalidateQueries({ queryKey: ['news'] });
+      return response;
+    },
   });
 }
 
