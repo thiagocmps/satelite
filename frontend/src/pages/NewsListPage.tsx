@@ -66,6 +66,7 @@ export function NewsListPage() {
     <>
       <PageHeader
         title="Noticias"
+        eyebrow="MISSÃO · RECEPÇÃO CONTÍNUA"
         description="Agregacao de fontes RSS publicas com busca e filtros."
         action={
           <button type="button" className="button" onClick={() => ingest.mutate({})} disabled={ingest.isPending}>

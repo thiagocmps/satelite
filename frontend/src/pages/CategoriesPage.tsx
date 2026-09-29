@@ -65,6 +65,7 @@ export function CategoriesPage() {
     <>
       <PageHeader
         title="Categorias"
+        eyebrow="MISSÃO · MAPA DE TEMAS"
         description="Organize as noticias por tema. As palavras-chave sao aplicadas na ingestao: a regra que casar vence a categoria padrao da fonte."
       />
 

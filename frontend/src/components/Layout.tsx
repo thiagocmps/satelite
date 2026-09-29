@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { SatelliteIcon } from './SatelliteIcon';
 
 const links = [
   { to: '/', label: 'Noticias', end: true },
@@ -13,7 +14,7 @@ export function Layout() {
         <div className="container site-header__inner">
           <NavLink to="/" className="brand">
             <span className="brand__mark" aria-hidden="true">
-              S
+              <SatelliteIcon size={20} />
             </span>
             Satelite
           </NavLink>
@@ -41,8 +42,13 @@ export function Layout() {
 
       <footer className="site-footer">
         <div className="container">
-          Fontes RSS publicas + resumo por IA. Conteúdo e resumo pertencem aos respectivos autores; a
-          marcação de resumo indica texto gerado por modelo.
+          <p style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+            <span className="footer__signal" aria-hidden="true" />
+            <span>
+              Transmitido da orbita baixa — fontes RSS publicas + resumo por IA. Conteúdo e resumo
+              pertencem aos respectivos autores; a marcação de resumo indica texto gerado por modelo.
+            </span>
+          </p>
         </div>
       </footer>
     </div>

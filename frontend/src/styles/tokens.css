@@ -1,26 +1,31 @@
 /* Design tokens: uma unica fonte de verdade para cores, espacos e tipografia.
-   Tema claro e escuro trocam pelos mesmos nomes. */
+   Tema espacial — "noite profunda" (dark) e "amanhecer orbital" (light) —
+   trocam pelos mesmos nomes. */
 
 :root {
   color-scheme: light dark;
 
   /* superficies */
-  --bg: #f6f7f9;
+  --bg: #eef3fb;
   --surface: #ffffff;
-  --surface-2: #f1f3f6;
-  --border: #dfe3e9;
-  --border-strong: #c4cad3;
+  --surface-2: #eef2f9;
+  --border: #d9e2ef;
+  --border-strong: #b7c5da;
 
   /* texto */
-  --text: #12161c;
-  --text-muted: #5b6675;
-  --text-faint: #8a94a3;
+  --text: #101b2e;
+  --text-muted: #46566e;
+  --text-faint: #5f6e88;
 
-  /* acao */
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-soft: #e5edff;
+  /* acao: azul-satelite */
+  --accent: #1e4fd8;
+  --accent-hover: #1740c4;
+  --accent-soft: #e3ecff;
   --on-accent: #ffffff;
+
+  /* secundario: violeta nebulosa */
+  --nebula: #7c3aed;
+  --nebula-soft: #f0eaff;
 
   /* semantica */
   --danger: #b42318;
@@ -29,16 +34,21 @@
   --success-soft: #dcfae6;
   --warning: #b54708;
   --warning-soft: #fef0c7;
-  --ai: #6941c6;
-  --ai-soft: #f4ebff;
+  --ai: #7c3aed;
+  --ai-soft: #f3ecff;
 
   /* forma */
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
-  --shadow: 0 4px 14px rgb(16 24 40 / 8%);
-  --shadow-lg: 0 12px 32px rgb(16 24 40 / 12%);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 8%);
+  --shadow: 0 4px 14px rgb(16 24 40 / 10%);
+  --shadow-lg: 0 12px 32px rgb(16 24 40 / 16%);
+  --glow: 0 0 22px color-mix(in srgb, var(--accent) 24%, transparent);
+
+  /* espaco */
+  --star: #cfe0f7;
+  --orbital-line: linear-gradient(90deg, transparent, var(--accent), var(--nebula), transparent);
 
   /* tipografia */
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -58,32 +68,39 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0e13;
-    --surface: #141922;
-    --surface-2: #1b212b;
-    --border: #262e3a;
-    --border-strong: #38424f;
+    /* noite profunda */
+    --bg: #05070b;
+    --surface: #0c1322;
+    --surface-2: #131d31;
+    --border: #1c2942;
+    --border-strong: #2b3c5e;
 
-    --text: #eef1f5;
-    --text-muted: #a3adba;
-    --text-faint: #74808f;
+    --text: #e9eefb;
+    --text-muted: #9fadc3;
+    --text-faint: #8495b1;
 
-    --accent: #6f9bff;
-    --accent-hover: #8fb2ff;
-    --accent-soft: #1b2740;
-    --on-accent: #08101f;
+    --accent: #47c4f5;
+    --accent-hover: #83d9ff;
+    --accent-soft: rgb(71 196 245 / 13%);
+    --on-accent: #05141f;
 
-    --danger: #fda29b;
-    --danger-soft: #3a1a18;
-    --success: #6ce9a6;
-    --success-soft: #10321f;
-    --warning: #fec84b;
-    --warning-soft: #3a2a0a;
-    --ai: #c3a4ff;
-    --ai-soft: #2a1f45;
+    --nebula: #a78bfa;
+    --nebula-soft: rgb(167 139 250 / 14%);
+
+    --danger: #fb7185;
+    --danger-soft: rgb(244 63 94 / 14%);
+    --success: #34d399;
+    --success-soft: rgb(52 211 153 / 14%);
+    --warning: #fbbf24;
+    --warning-soft: rgb(251 191 36 / 14%);
+    --ai: #c9b8ff;
+    --ai-soft: rgb(167 139 250 / 16%);
+
+    --star: #dbe7ff;
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow: 0 4px 14px rgb(0 0 0 / 45%);
-    --shadow-lg: 0 12px 32px rgb(0 0 0 / 55%);
+    --shadow: 0 4px 18px rgb(0 0 0 / 50%);
+    --shadow-lg: 0 12px 36px rgb(0 0 0 / 60%);
+    --glow: 0 0 26px color-mix(in srgb, var(--accent) 30%, transparent);
   }
 }

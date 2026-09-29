@@ -1,12 +1,74 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1e3a8a"/>
-      <stop offset="1" stop-color="#0b1220"/>
+      <stop offset="0" stop-color="#0b1b3a"/>
+      <stop offset="1" stop-color="#04060c"/>
+    </linearGradient>
+    <radialGradient id="nebula1" cx="0.18" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#6d28d9" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#6d28d9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nebula2" cx="0.88" cy="0.92" r="0.8">
+      <stop offset="0" stop-color="#0891b2" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cfe6ff"/>
+      <stop offset="1" stop-color="#7fb6ee"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9e8f8"/>
     </linearGradient>
   </defs>
+
   <rect width="1024" height="1024" fill="url(#bg)"/>
-  <ellipse cx="512" cy="524" rx="352" ry="150" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="24" transform="rotate(-26 512 524)"/>
-  <path d="M 520 196 A 162 162 0 0 0 520 492" fill="none" stroke="#ffffff" stroke-width="118" stroke-linecap="round"/>
-  <path d="M 520 508 A 162 162 0 0 1 520 804" fill="none" stroke="#ffffff" stroke-width="118" stroke-linecap="round"/>
+  <rect width="1024" height="1024" fill="url(#nebula1)"/>
+  <rect width="1024" height="1024" fill="url(#nebula2)"/>
+
+  <!-- campo de estrelas -->
+  <g fill="#eef4ff">
+    <circle cx="120" cy="140" r="5" opacity="0.85"/>
+    <circle cx="880" cy="220" r="4" opacity="0.6"/>
+    <circle cx="300" cy="820" r="4" opacity="0.5"/>
+    <circle cx="760" cy="760" r="5" opacity="0.7"/>
+    <circle cx="200" cy="520" r="3" opacity="0.45"/>
+    <circle cx="850" cy="480" r="3" opacity="0.5"/>
+    <circle cx="520" cy="90" r="3.5" opacity="0.6"/>
+    <circle cx="90" cy="360" r="3" opacity="0.4"/>
+    <circle cx="620" cy="150" r="2.5" opacity="0.5"/>
+    <circle cx="400" cy="60" r="2.5" opacity="0.45"/>
+    <circle cx="700" cy="880" r="3" opacity="0.5"/>
+    <circle cx="180" cy="650" r="2.5" opacity="0.4"/>
+  </g>
+
+  <!-- anel orbital -->
+  <ellipse cx="512" cy="580" rx="380" ry="140" fill="none" stroke="#7dd3fc" stroke-opacity="0.22" stroke-width="10" transform="rotate(-18 512 580)"/>
+
+  <!-- paineis solares (2 andares em cada lado) -->
+  <rect x="120" y="432" width="230" height="42" rx="16" fill="url(#panel)" stroke="#0b1b3a" stroke-width="6"/>
+  <rect x="120" y="560" width="230" height="42" rx="16" fill="url(#panel)" stroke="#0b1b3a" stroke-width="6"/>
+  <rect x="674" y="432" width="230" height="42" rx="16" fill="url(#panel)" stroke="#0b1b3a" stroke-width="6"/>
+  <rect x="674" y="560" width="230" height="42" rx="16" fill="url(#panel)" stroke="#0b1b3a" stroke-width="6"/>
+
+  <!-- suportes dos paineis -->
+  <g stroke="#b7cde8" stroke-width="14" stroke-linecap="round">
+    <path d="M350 453 H410"/>
+    <path d="M350 581 H410"/>
+    <path d="M614 453 H674"/>
+    <path d="M614 581 H674"/>
+  </g>
+
+  <!-- corpo do satelite -->
+  <rect x="410" y="352" width="204" height="252" rx="44" fill="url(#body)" stroke="#0b1b3a" stroke-width="8"/>
+  <rect x="440" y="418" width="144" height="16" rx="8" fill="#9fb8d6"/>
+
+  <!-- LED de sinal -->
+  <circle cx="512" cy="540" r="22" fill="#22d3ee"/>
+
+  <!-- antena -->
+  <path d="M512 352 V268" stroke="#b7cde8" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="512" cy="232" r="56" fill="none" stroke="#dcebfb" stroke-width="16"/>
+  <circle cx="512" cy="232" r="56" fill="none" stroke="#22d3ee" stroke-width="16" stroke-dasharray="130 240" stroke-linecap="round" transform="rotate(24 512 232)"/>
+  <circle cx="512" cy="232" r="15" fill="#22d3ee"/>
 </svg>

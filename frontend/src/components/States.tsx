@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 export function EmptyState({ title, hint, action }: { title: string; hint?: ReactNode; action?: ReactNode }) {
   return (
     <div className="empty">
+      <div className="empty__icon" aria-hidden="true" />
       <p style={{ fontWeight: 600 }}>{title}</p>
       {hint ? <p className="small">{hint}</p> : null}
       {action ? <div style={{ marginTop: 'var(--sp-3)' }}>{action}</div> : null}

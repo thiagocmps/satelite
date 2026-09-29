@@ -21,6 +21,42 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Fundo cosmico em camadas fixas (atras do conteudo): nebulosas + campo de estrelas.
+   Sem animacao; `prefers-reduced-motion` nao precisa fazer nada alem do padrao. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  background:
+    radial-gradient(640px 420px at 12% 8%, color-mix(in srgb, var(--nebula) 16%, transparent), transparent 65%),
+    radial-gradient(760px 520px at 88% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 65%),
+    radial-gradient(900px 640px at 50% 115%, color-mix(in srgb, var(--nebula) 13%, transparent), transparent 65%);
+}
+
+body::after {
+  background-image:
+    radial-gradient(1px 1px at 32px 24px, var(--star), transparent 1.6px),
+    radial-gradient(1.5px 1.5px at 92px 118px, var(--star), transparent 2.2px),
+    radial-gradient(1px 1px at 152px 58px, var(--star), transparent 1.6px),
+    radial-gradient(1.5px 1.5px at 214px 182px, var(--star), transparent 2.2px),
+    radial-gradient(1px 1px at 58px 224px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 262px 262px, var(--star), transparent 1.6px);
+  background-size: 300px 300px;
+  opacity: 0.22;
+}
+
+@media (prefers-color-scheme: dark) {
+  body::after {
+    opacity: 0.55;
+  }
+}
+
 img {
   display: block;
   max-width: 100%;
@@ -73,9 +109,23 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
   border-bottom: 1px solid var(--border);
+}
+
+/* fio de luz orbital na base do header */
+.site-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--orbital-line);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .site-header__inner {
@@ -83,8 +133,9 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  min-height: 60px;
+  min-height: 64px;
   flex-wrap: wrap;
+  padding-block: env(safe-area-inset-top) 0;
 }
 
 .brand {
@@ -97,15 +148,20 @@ textarea {
 }
 
 .brand__mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: linear-gradient(140deg, var(--accent), var(--ai));
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(140deg, var(--accent), var(--nebula));
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 14px;
-  font-weight: 800;
+  box-shadow: var(--glow), inset 0 1px 0 rgb(255 255 255 / 30%);
+}
+
+.brand__mark svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .nav {
@@ -115,11 +171,12 @@ textarea {
 }
 
 .nav a {
-  padding: 6px 12px;
+  padding: 9px 14px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-weight: 500;
   font-size: 0.94rem;
+  white-space: nowrap;
 }
 
 .nav a:hover {
@@ -130,24 +187,77 @@ textarea {
 .nav a.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+  box-shadow: inset 0 -1px 0 var(--accent);
 }
 
 .site-main {
   flex: 1;
   padding-block: var(--sp-6) var(--sp-7);
+  padding-bottom: calc(var(--sp-7) + env(safe-area-inset-bottom));
 }
 
 .site-footer {
   border-top: 1px solid var(--border);
   padding-block: var(--sp-4);
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
   color: var(--text-faint);
   font-size: 0.85rem;
 }
 
+.footer__signal {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent),
+    0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent),
+      0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 8%, transparent),
+      0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+.page-title,
+.detail__title,
+.news-card__title,
+.panel__title {
+  text-wrap: balance;
+}
+
 .page-title {
-  font-size: clamp(1.4rem, 1.1rem + 1.4vw, 1.9rem);
+  font-size: clamp(1.45rem, 1.15rem + 1.5vw, 2rem);
   letter-spacing: -0.02em;
-  margin-bottom: var(--sp-1);
+  margin-bottom: var(--sp-2);
+}
+
+.page-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+
+.page-eyebrow::before {
+  content: '';
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0.7;
 }
 
 .page-subtitle {
@@ -163,6 +273,7 @@ textarea {
   justify-content: center;
   gap: var(--sp-2);
   padding: 8px 14px;
+  min-height: 40px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -221,6 +332,7 @@ textarea {
 
 .button--sm {
   padding: 5px 10px;
+  min-height: 32px;
   font-size: 0.85rem;
 }
 
@@ -245,6 +357,7 @@ textarea {
 .select {
   width: 100%;
   padding: 8px 10px;
+  min-height: 42px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -303,20 +416,52 @@ textarea {
 .news-grid {
   display: grid;
   gap: var(--sp-4);
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+
+/* aro de gradiente orbital que acende no hover */
+.news-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent 35%,
+    transparent 65%,
+    color-mix(in srgb, var(--nebula) 45%, transparent)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.18s;
+  pointer-events: none;
 }
 
 .news-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform 0.15s, box-shadow 0.18s, border-color 0.18s;
 }
 
 .news-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
-  border-color: var(--border-strong);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow), var(--glow);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong));
+}
+
+.news-card:hover::before {
+  opacity: 1;
 }
 
 .news-card__media {
@@ -334,8 +479,34 @@ textarea {
 }
 
 .news-card__media--empty {
+  position: relative;
+  background:
+    radial-gradient(140px 90px at 78% 22%, color-mix(in srgb, var(--nebula) 30%, transparent), transparent 70%),
+    radial-gradient(120px 80px at 18% 88%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%),
+    var(--surface-2);
   color: var(--text-faint);
-  font-size: 1.6rem;
+  overflow: hidden;
+}
+
+/* micro-campo de estrelas dentro do placeholder */
+.news-card__media--empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, var(--star), transparent 1.6px),
+    radial-gradient(1.5px 1.5px at 70% 18%, var(--star), transparent 2.2px),
+    radial-gradient(1px 1px at 46% 72%, var(--star), transparent 1.6px),
+    radial-gradient(1.5px 1.5px at 88% 78%, var(--star), transparent 2.2px),
+    radial-gradient(1px 1px at 8% 60%, var(--star), transparent 1.6px);
+  opacity: 0.45;
+}
+
+.news-card__media--empty svg {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  color: var(--text-faint);
 }
 
 .news-card__body {
@@ -552,10 +723,11 @@ textarea {
 /* ------------------------------------------------------------ resumo IA */
 
 .ai-box {
-  border: 1px solid var(--ai);
+  border: 1px solid color-mix(in srgb, var(--ai) 60%, transparent);
   background: var(--ai-soft);
   border-radius: var(--radius);
   padding: var(--sp-4);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--ai) 12%, transparent);
 }
 
 .ai-box__label {
@@ -705,6 +877,45 @@ textarea {
   color: var(--text-muted);
 }
 
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* radar orbital: dois aneis concêntricos + ponto central pulsante */
+.empty__icon {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  margin-bottom: var(--sp-2);
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.empty__icon::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--nebula) 45%, transparent);
+}
+
+.empty__icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
 .error-box {
   background: var(--danger-soft);
   border: 1px solid var(--danger);
@@ -713,7 +924,7 @@ textarea {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%);
+  background: linear-gradient(90deg, var(--surface-2) 25%, color-mix(in srgb, var(--border) 70%, transparent) 37%, var(--surface-2) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
   border-radius: var(--radius-sm);
@@ -733,14 +944,28 @@ textarea {
   border-radius: var(--radius);
 }
 
+/* spinner orbital: anel + ponto que orbita (o anel gira carregando o ponto) */
 .spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  position: relative;
   display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -3px;
+}
+
+.spinner::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 @keyframes spin {
@@ -768,7 +993,10 @@ textarea {
   border-color: var(--success);
 }
 
-@media (max-width: 640px) {
+/* ------------------------------------------------------------ responsivo */
+
+/* telas medias: filtros em duas colunas, busca ocupando a linha inteira */
+@media (max-width: 860px) {
   .filters {
     grid-template-columns: 1fr 1fr;
   }
@@ -777,8 +1005,123 @@ textarea {
     grid-column: 1 / -1;
   }
 
+  .filters__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+/* telas pequenas: filtros em uma coluna, tabelas viram cards, aside nao fica sticky */
+@media (max-width: 640px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .filters > *:first-child {
+    grid-column: auto;
+  }
+
+  .filters__actions {
+    grid-column: auto;
+    width: 100%;
+  }
+
+  .filters__actions .button {
+    flex: 1;
+  }
+
   .detail__aside {
     position: static;
+  }
+
+  .table__scroll {
+    overflow: visible;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: var(--sp-3);
+    margin-bottom: var(--sp-3);
+  }
+
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    padding: var(--sp-2) 0;
+    text-align: right;
+  }
+
+  .table td > * {
+    min-width: 0;
+  }
+
+  /* a URL do feed ocupa a linha inteira, quebrando em varias linhas */
+  .table td[data-label] .mono {
+    flex-basis: 100%;
+  }
+
+  .table td:last-child {
+    border-bottom: none;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+  }
+
+  .table td[data-label='']::before {
+    display: none;
+  }
+
+  .table .row-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+/* telas muito estreitas: header centrado e paginacao empilhada */
+@media (max-width: 420px) {
+  .site-header__inner {
+    justify-content: center;
+    row-gap: var(--sp-2);
+  }
+
+  .nav a {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+  }
+
+  .pagination {
+    gap: var(--sp-3);
+  }
+
+  .pagination__info {
+    order: -1;
+    width: 100%;
+    text-align: center;
   }
 }
 

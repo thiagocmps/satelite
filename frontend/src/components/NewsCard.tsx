@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Article } from '../api/types';
 import { formatRelative, hostFromUrl } from '../utils/format';
+import { SatelliteIcon } from './SatelliteIcon';
 
 type Props = { article: Article };
 
@@ -13,7 +14,7 @@ export function NewsCard({ article }: Props) {
           {article.imageUrl ? (
             <img src={article.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
           ) : (
-            <span aria-hidden="true">◍</span>
+            <SatelliteIcon size={34} />
           )}
         </div>
       </Link>

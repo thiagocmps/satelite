@@ -89,6 +89,7 @@ export function SourcesPage() {
     <>
       <PageHeader
         title="Fontes"
+        eyebrow="MISSÃO · ANTENAS"
         description="Feeds RSS/Atom monitorados. A ingestao roda por agendamento e tambem pode ser disparada aqui."
         action={
           <>
@@ -311,7 +312,7 @@ export function SourcesPage() {
                 <tbody>
                   {list.map((source) => (
                     <tr key={source.id}>
-                      <td>
+                      <td data-label="Fonte">
                         <div className="row" style={{ gap: 'var(--sp-2)' }}>
                           <strong>{source.name}</strong>
                           {source.category ? <span className="badge">{source.category.name}</span> : null}
@@ -324,9 +325,11 @@ export function SourcesPage() {
                           </div>
                         ) : null}
                       </td>
-                      <td>{statusBadge(source.lastStatus, source.lastError)}</td>
-                      <td className="muted small">{formatDateTime(source.lastFetchedAt)}</td>
-                      <td>
+                      <td data-label="Status">{statusBadge(source.lastStatus, source.lastError)}</td>
+                      <td data-label="Ultima execucao" className="muted small">
+                        {formatDateTime(source.lastFetchedAt)}
+                      </td>
+                      <td data-label="Acoes">
                         <div className="row-actions">
                           <button
                             type="button"
@@ -386,9 +389,11 @@ export function SourcesPage() {
                 <tbody>
                   {recentRuns.map((run) => (
                     <tr key={run.id}>
-                      <td className="muted small">{formatDateTime(run.startedAt)}</td>
-                      <td>{run.sourceName ?? '—'}</td>
-                      <td>
+                      <td data-label="Inicio" className="muted small">
+                        {formatDateTime(run.startedAt)}
+                      </td>
+                      <td data-label="Fonte">{run.sourceName ?? '—'}</td>
+                      <td data-label="Status">
                         <span
                           className={`badge ${
                             run.status === 'ok' ? 'badge--ok' : run.status === 'error' ? 'badge--error' : ''
@@ -399,9 +404,9 @@ export function SourcesPage() {
                           {run.httpStatus ? ` · ${run.httpStatus}` : ''}
                         </span>
                       </td>
-                      <td>{run.fetched}</td>
-                      <td>{run.inserted}</td>
-                      <td>{run.duplicates}</td>
+                      <td data-label="Itens">{run.fetched}</td>
+                      <td data-label="Inseridos">{run.inserted}</td>
+                      <td data-label="Duplicados">{run.duplicates}</td>
                     </tr>
                   ))}
                 </tbody>
