@@ -107,13 +107,26 @@ O motor deterministico normaliza o texto (minusculas, sem acento, espacos colaps
 mais curta (a mais especifica vence por categoria). Sem decisao deterministica e com texto de pelo
 menos `AI_CLASSIFY_MIN_TEXT_CHARS`, o item entra na fila `needs_ai`.
 
+**Filtro de esporte** (`CONTENT_FILTER_SPORTS=true`, padrao): `isSportsContent` em
+`classification/sports-block.ts` checa titulo+descricao contra ~110 termos PT/EN (clubes,
+modalidades, competicoes) com a mesma normalizacao e borda de palavra da keyword. Na ingestao o item
+e descartado antes do INSERT (contador `filteredSports` no relatorio); na fila de classificacao ele
+sai sem chamar modelo (contador `blocked`). Unica excecao: a keyword ja decidiu **Politica**
+(proibicao de bets, regras da Copa) — politica que cita esporte permanece. `sportsTermsForSql()`
+exporta os termos para gerar SQL de limpeza a partir da MESMA fonte unica (veja a nota em
+`README`/auditoria: termos ambíguos como "fluminense", "liverpool", "squash", "rally" e
+"olimpiada" singular foram removidos porque derrubavam politica/ciencia/lazer). Cobertura em
+`sports-block.test.ts` com casos de falso positivo.
+
 `classification.service.ts` processa a fila: quem a regra decide sai sem custo de modelo; texto curto
-demais fica como esta; o resto vai para a IA (OpenRouter, `classify` com `response_format:
-json_object`) com o catalogo real de categorias (slug + nome). O modelo responde
-`{"categorySlug", "confidence"}`; slug fora do catalogo ou confianca abaixo de
-`AI_CLASSIFY_MIN_CONFIDENCE` nao aplica categoria. O veredito grava `category_method`
+demais fica como esta; esporte sai sem custo; o resto vai para a IA (OpenRouter, `classify` com
+`response_format: json_object`) com o catalogo real de categorias (slug + nome) e o prompt
+few-shot que manda **o titulo decidir**, **esporte → nenhuma categoria** e **duvida → nenhuma**.
+O modelo responde `{"categorySlug", "confidence"}`; slug fora do catalogo ou confianca abaixo de
+`AI_CLASSIFY_MIN_CONFIDENCE` (0.6) nao aplica categoria. O veredito grava `category_method`
 (`'keyword'`/`'ai'`) e `category_confidence` direto em `articles`. Falha de IA mantem `needs_ai`
-para a proxima rodada. Dispare `POST /ingest/classify` (ou o botao em Fontes).
+para a proxima rodada; 429 aborta a rodada (cota gratuita = 50 req/dia). Dispare
+`POST /ingest/classify` (ou o botao em Fontes).
 
 ### 6. Persistência e leitura
 
@@ -182,7 +195,8 @@ regenerados no próximo clique, sem apagar o histórico.
 
 ### Chamada
 
-`backend/src/integrations/ai/openrouter.provider.ts`
+`backend/src/integrations/ai/openai-compatible.provider.ts` (base compartilhada; as variações
+ficam em `openrouter.provider.ts` e `opencode.provider.ts`)
 
 ```http
 POST https://openrouter.ai/api/v1/chat/completions
@@ -193,9 +207,18 @@ X-Title: $APP_NAME
 { "model": "openrouter/free", "messages": [...], "temperature": 0.3 }
 ```
 
+No OpenCode Zen (`https://opencode.ai/zen/v1`), a mesma chamada usa `Authorization: Bearer public`
+e `"model": "space-bunny-free"` — o `OpenCodeProvider` reusa o pedaço OpenAI-compatível inteiro.
+Na classificação o body ganha `"response_format": { "type": "json_object" }` e `temperature: 0`.
+
 Ordem das tentativas: modelo principal (`AI_MAX_RETRIES` vezes em 429/5xx, honrando `Retry-After`),
 depois cada modelo de `AI_FALLBACK_MODELS`. Erro mapeado para `AI_AUTH_INVALID`, `AI_QUOTA`,
 `AI_RATE_LIMIT`, `AI_UPSTREAM_ERROR` ou `AI_BAD_RESPONSE`.
+
+`CompositeProvider` (quando `AI_FALLBACK_PROVIDERS` tem mais de um nome) embrulha a cadeia de
+**provedores**: falha em `AI_QUOTA`/`AI_RATE_LIMIT`/`AI_UPSTREAM_ERROR`/timeout/gateway fora cai para
+o próximo; credencial ou resposta ilegível não troca. Se todos falham, relança o último erro — o
+circuito do classificador (abort no 1º 429 geral) continua valendo.
 
 ### Cache
 
@@ -233,6 +256,9 @@ cd backend && npx vitest run -t "dedup"          # por nome
 | `core/html.test.ts`                                  | limpeza de HTML, entidades, CDATA                        |
 | `integrations/rss/rss.normalize.test.ts`             | imagens, autores, datas, feeds incompletos               |
 | `integrations/ai/openrouter.provider.test.ts`        | retry, fallback, mapeamento de erro, cache, classify     |
+| `integrations/ai/opencode.provider.test.ts`          | endpoint/chave do Zen, JSON estrito, fallback de modelo  |
+| `integrations/ai/composite.provider.test.ts`         | cadeia: failover em cota/429/5xx/timeout; sem troca em credencial; relança o último erro |
+| `integrations/ai/ai.registry.test.ts`                | montagem da cadeia, validação de `OPENROUTER_API_KEY` no fallback |
 | `integrations/ai/ai.classify.test.ts`                | prompt do catalogo, parsing e allowlist de slugs         |
 | `modules/classification/keyword-engine.test.ts`      | regras, acento, borda de palavra, ambiguidade            |
 | `modules/classification/classification.service.test.ts` | fila: keyword sem custo, IA na duvida, falha pendente |
@@ -251,7 +277,8 @@ Padrão para dublês: interface do repositório + classe em memória que guarda 
 | -------------------------------------- | -------------------------------------------------------------- |
 | Adicionar campo na notícia             | migration + `news.types.ts` + `SELECT_ARTICLE` + `frontend/src/api/types.ts` |
 | Novo filtro na listagem                | `news.schemas.ts` + `buildFilters` + `Filters.tsx`              |
-| Novo provedor de IA                    | `ai.provider.ts` (interface) + arquivo novo + `ai.registry.ts`  |
+| Novo provedor de IA                    | `openai-compatible.provider.ts` (base) + subclasse + `ai.registry.ts` (+ env se precisar de vars próprias) |
+| Encadear fallback entre provedores     | `AI_FALLBACK_PROVIDERS` no `.env` (nomes registrados no registry) |
 | Novo passo na ingestão                 | `ingestion.service.ts` (e o `NormalizedArticle`, se o dado for novo) |
 | Nova rota                              | `*.routes.ts` + `*.controller.ts` + `routes/index.ts`            |
 | Novo tema/cor                          | `styles/tokens.css`                                             |

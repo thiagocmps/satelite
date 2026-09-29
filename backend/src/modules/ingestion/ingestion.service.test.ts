@@ -72,6 +72,8 @@ function setup(overrides: Partial<IngestionDeps> = {}) {
     concurrency: 2,
     aiClassifyEnabled: true,
     minClassifyTextChars: 120,
+    blockSports: false,
+    politicaCategoryId: async () => null,
     ...overrides,
   };
 
@@ -221,6 +223,85 @@ describe('IngestionService.ingestSource', () => {
     expect(captured).toEqual([
       { title: 'TJMT retoma expediente e mantem prazos suspensos', categoryId: null, needsAi: true },
     ]);
+  });
+
+  it('com CONTENT_FILTER_SPORTS=true descarta conteudo esportivo na ingestao', async () => {
+    const { service, state } = setup({
+      blockSports: true,
+      loadFeed: async () => ({
+        notModified: false,
+        status: 200,
+        etag: null,
+        lastModified: null,
+        items: [
+          item('Flamengo vence classico e assume a lideranca'),
+          item('Governo anuncia pacote contra a fome'),
+          item('Corrida eleitoral esquenta com pesquisas'),
+        ],
+      }),
+    });
+
+    const result = await service.ingestSource(g1);
+
+    // so o esportivo foi descartado; politica/corrida eleitoral seguem normais
+    expect(state.inserted).toEqual(['Governo anuncia pacote contra a fome', 'Corrida eleitoral esquenta com pesquisas']);
+    expect(result).toMatchObject({ fetched: 3, inserted: 2, filteredSports: 1 });
+  });
+
+  it('com CONTENT_FILTER_SPORTS=false nao filtra nada', async () => {
+    const { service, state } = setup({
+      loadFeed: async () => ({
+        notModified: false,
+        status: 200,
+        etag: null,
+        lastModified: null,
+        items: [item('Flamengo vence classico'), item('Noticia normal')],
+      }),
+    });
+
+    const result = await service.ingestSource(g1);
+
+    expect(result).toMatchObject({ inserted: 2, filteredSports: 0 });
+    expect(state.inserted).toEqual(['Flamengo vence classico', 'Noticia normal']);
+  });
+
+  it('politica que cita esporte (bets/Lula) NAO e filtrada pelo bloqueio', async () => {
+    const captured: Array<{ title: string; categoryId: string | null; needsAi: boolean }> = [];
+    const { service } = setup({
+      blockSports: true,
+      politicaCategoryId: async () => 'cat-politica',
+      listRules: async () => [{ categoryId: 'cat-politica', keyword: 'lula' }],
+      loadFeed: async () => ({
+        notModified: false,
+        status: 200,
+        etag: null,
+        lastModified: null,
+        items: [
+          {
+            title: 'Lula adia reuniao para discutir impacto das bets no futebol',
+            link: 'https://exemplo.com/lula-bets',
+            contentSnippet: 'O presidente se reune com clubes para tratar da proibicao.',
+          },
+          item('Flamengo vence classico no Maracana'),
+        ],
+      }),
+      news: {
+        list: async () => ({ data: [], pagination: { page: 1, limit: 1, total: 0, totalPages: 0, hasNext: false, hasPrev: false } }),
+        findById: async () => null,
+        insertMany: async (articles) => {
+          captured.push(...articles.map((a) => ({ title: a.title, categoryId: a.categoryId, needsAi: a.needsAi })));
+          return { inserted: articles.length, duplicates: 0 };
+        },
+      },
+    });
+
+    const result = await service.ingestSource(g1);
+
+    // politica entra (com categoria por keyword), esporte continua fora
+    expect(captured).toEqual([
+      { title: 'Lula adia reuniao para discutir impacto das bets no futebol', categoryId: 'cat-politica', needsAi: false },
+    ]);
+    expect(result).toMatchObject({ fetched: 2, inserted: 1, filteredSports: 1 });
   });
 });
 

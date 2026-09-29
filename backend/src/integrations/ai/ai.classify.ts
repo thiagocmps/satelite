@@ -34,12 +34,20 @@ export function buildClassifyMessages(
 
 function systemClassifyPrompt(language: string): string {
   return [
-    'Voce e um classificador de noticias de um agregador de RSS.',
-    'Escolha a UNICA categoria mais adequada para o artigo entre as listadas (pelos slugs).',
+    'Voce e um classificador de noticias de um agregador RSS.',
+    'O TITULO da noticia e a fonte principal da decisao; use a descricao e o texto apenas como apoio, nunca contra o titulo.',
     `Responda em ${language}, apenas com JSON valido: {"categorySlug": string ou null, "confidence": numero entre 0 e 1}.`,
-    'Use o slug exatamente como fornecido. Use null em categorySlug quando nenhuma categoria se aplica.',
-    'Confidence mede a sua certeza: valores abaixo de 0.5 significam escolha incerta demais para classificar.',
-    'Nao invente slugs: so os listados podem ser usados.',
+    'Escolha a UNICA categoria mais adequada entre os slugs listados. Use exatamente um dos slugs fornecidos; nunca invente slugs.',
+    'Regras de ouro:',
+    '1. Conteudo ESPORTIVO nunca e classificado: futebol, automobilismo, tenis, xadrez, olimpiadas, vôlei, boxe ou qualquer outro esporte responde categorySlug: null.',
+    '2. Sem certeza suficiente (titulo generico, chamada para clique, preview sem conteudo) responde null em vez de adivinhar.',
+    '3. Noticia internacional (fora do Brasil) sem viés brasileiro vai para mundo; ciencia, tecnologia e economia internacionais mantem a categoria propria.',
+    '4. Confidence: alta (0.8+) quando o titulo sozinho deixa a categoria clara; 0.6-0.79 quando razoavel; abaixo de 0.6 nao classifica (null).',
+    'Exemplos (titulo -> categoria, confidence):',
+    `"Lula anuncia pacote contra a fome" -> {"categorySlug":"politica","confidence":0.95}`,
+    `"Terremoto deixa milhares desabrigados no Japao" -> {"categorySlug":"mundo","confidence":0.95}`,
+    `"Nova vacina contra dengue aprova fase 3" -> {"categorySlug":"ciencia","confidence":0.95}`,
+    `"Flamengo vence classico e assume a lideranca" -> {"categorySlug":null,"confidence":0.0}`,
   ].join(' ');
 }
 

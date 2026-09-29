@@ -5,6 +5,7 @@ import type { AiProvider } from '../../integrations/ai/ai.provider.js';
 import type { CategoriesRepository } from '../categories/categories.repository.js';
 import type { ClassificationRepository, PendingArticle, ResolveVerdict } from './classification.repository.js';
 import { buildArticleText, buildKeywordIndex, buildKeywordText, classifyText, type KeywordIndex } from './keyword-engine.js';
+import { isSportsContent } from './sports-block.js';
 
 export type ClassificationReport = {
   processed: number;
@@ -12,6 +13,8 @@ export type ClassificationReport = {
   resolvedKeyword: number;
   /** Sem decisao deterministica e texto curto demais para a IA. */
   resolvedShort: number;
+  /** Conteudo esportivo: sai da fila (nao gasta modelo nem recebe categoria). */
+  blocked: number;
   aiCalls: number;
   /** A IA atribuiu uma categoria (confianca >= piso). */
   aiAssigned: number;
@@ -33,6 +36,8 @@ export type ClassificationDeps = {
   minConfidence: number;
   batchSize: number;
   concurrency: number;
+  /** Dropa conteudo esportivo antes de qualquer chamada de IA (CONTENT_FILTER_SPORTS). */
+  blockSports: boolean;
   logger: Logger;
 };
 
@@ -59,6 +64,7 @@ export class ClassificationService {
       processed: 0,
       resolvedKeyword: 0,
       resolvedShort: 0,
+      blocked: 0,
       aiCalls: 0,
       aiAssigned: 0,
       errors: 0,
@@ -113,6 +119,20 @@ export class ClassificationService {
   ): Promise<void> {
     report.processed += 1;
     try {
+      // esporte nunca paga modelo nem recebe categoria (sai da fila). Artigos ja
+      // categorizados (ex.: politica que cita esporte) mantem a categoria:
+      // Verdict com categoryId null preserva a categoria atual.
+      if (this.deps.blockSports && isSportsContent(buildKeywordText(article))) {
+        await this.#resolve(article.id, {
+          categoryId: null,
+          method: null,
+          confidence: null,
+          aiClassified: false,
+        });
+        report.blocked += 1;
+        return;
+      }
+
       // decisao deterministica: titulo+descricao apenas (conteudo gera falso positivo)
       const keyword = classifyText(buildKeywordText(article), index);
 

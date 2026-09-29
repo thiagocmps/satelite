@@ -127,11 +127,43 @@ Sem decisão e com texto suficiente (`AI_CLASSIFY_MIN_TEXT_CHARS`), o artigo ent
 `articles.needs_ai` e o **segundo estágio** (IA) decide; texto curto demais sai da fila como está
 (vale a categoria padrão da fonte ou nenhuma).
 
-### 7. Resumo por IA sob demanda, cacheado
+**Filtro de conteúdo esportivo** (`CONTENT_FILTER_SPORTS`, padrão ligado): antes da categorização,
+`isSportsContent` (em `modules/classification/sports-block.ts`, ~110 termos PT/EN de clubes,
+modalidades e competições, com borda de palavra sobre o texto já normalizado) roda sobre o mesmo
+escopo da keyword (título + descrição). Casou → o item é **descartado na ingestão** (não entra no
+banco; contador `filteredSports` no relatório de execução) e, se já estiver na fila de classificação,
+sai dela **sem custo de modelo** (contador `blocked`). única exceção: notícia que a keyword já
+decidiu como **Política** — política que cita esporte (proibição de bets, regras da Copa) é mantida;
+o termo casou apenas como coadjuvante. A lista foi curada com auditoria ao vivo (termos ambíguos que
+derrubavam política/ciência/lazer — “fluminense”, “liverpool”, “squash”, “rally”, “olimpiada”
+singular — ficaram de fora) e tem testes de falso positivo. Como a keyword vence o filtro de esporte?
+Não: o filtro roda **antes** e a exceção só segura o que a keyword classificou como política.
+
+### 7. Classificação por IA (só na dúvida)
+
+O segundo estágio processa a fila `needs_ai` (`POST /ingest/classify` ou botão em Fontes). A ordem de
+prioridade por artigo: regra de keyword decide → sai sem custo; filtro de esporte (ou política que
+cita esporte, que sai mantendo a categoria) → sai sem custo; texto curto demais → sai como está; o
+restante vai para a IA com o catálogo real de categorias (slug + nome).
+
+O prompt de classificação é few-shot (4 exemplos) e instrui: **o título manda** (para um agregador
+multifonte o título é o argumento mais confiável), **esporte → não escolher categoria nenhuma** e
+**na dúvida → não escolher** (a dúvida custa menos que o erro). A resposta é JSON
+`{"categorySlug", "confidence"}`; slug fora do catálogo ou confiança abaixo de
+`AI_CLASSIFY_MIN_CONFIDENCE` (0.6) não aplica categoria, e tudo grava `category_method`/`category_confidence`
+em `articles`.
+
+**Cota e fallback de provedor:** a rodada aborta no primeiro 429 **geral** (cota OpenRouter gratuita
+= 50 req/dia). Com `AI_FALLBACK_PROVIDERS` (ex.: `opencode`, o OpenCode Zen, modelo gratuito)
+o abort só dispara quando **toda a cadeia** falha — o 429 do OpenRouter vira tentativa no Zen, e a
+fila continua andando sem esperar o reset diário (ver §9).
+
+### 8. Resumo por IA sob demanda, cacheado
 
 ```
 GET  /news/:id/summary   → 200 com data: null, ou o resumo salvo
 POST /news/:id/summary   → gera se não existir; devolve o salvo se existir
+```
 ```
 
 Quatro mecanismos evitam chamada duplicada:
@@ -149,32 +181,48 @@ que consome cota de terceiros.
 **Alternativa descartada:** gerar resumo na ingestão. Multiplicaria o consumo da cota gratuita por
 todo item coletado, a maioria nunca lido. Sob demanda + cache dá o mesmo resultado para quem lê.
 
-### 8. Provedor de IA intercambiável
+### 9. Provedor de IA intercambiável
 
 ```ts
 interface AiProvider {
-  readonly name: string;
+  readonly name: string;   // identificador estável gravado no banco
   readonly model: string;
-  generate(input: { title; description?; content?; language }): Promise<AiResult>;
+  summarize(input): Promise<AiSummaryResult>;
+  classify(input): Promise<AiSummaryResult>;
 }
 ```
 
-`ai.registry.ts` resolve `AI_PROVIDER` para uma implementação. `summaries.service.ts` só conhece a
-interface. Outro gateway = um arquivo novo e uma linha no registry.
+A maioria dos gateways fala uma API compatível com OpenAI `/chat/completions` (OpenRouter e o
+OpenCode Zen são dois exemplos). Por isso a implementação é uma classe única,
+`OpenAICompatibleProvider` em `integrations/ai/openai-compatible.provider.ts`, que recebe por
+configuração o que muda entre eles: `name`, chave, endpoint, modelo e o comportamento da
+classificação. Os registros `openrouter` e `opencode` são subclasses de uma linha — nada de SDK.
 
 Robustez, toda dentro do provider:
 
-- Timeout por `AbortSignal` (`AI_TIMEOUT_MS`).
+- Timeout por `AbortSignal` (`AI_TIMEOUT_MS`, no Zen reusa o mesmo).
 - Retry em 429/5xx, respeitando `Retry-After`, até `AI_MAX_RETRIES` por modelo.
 - Em seguida, tentativa no próximo modelo de `AI_FALLBACK_MODELS`.
-- Mapeamento de erro para códigos estáveis: `AI_AUTH_INVALID` (401), `AI_QUOTA` (402),
-  `AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR` (5xx/timeout), `AI_BAD_RESPONSE` (resposta vazia ou
-  sem conteúdo).
+- Mapeamento de erro para códigos estáveis: `AI_AUTH_INVALID` (401/403), `AI_QUOTA` (402),
+  `AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR` (5xx/gateway fora), `AI_BAD_RESPONSE` (resposta vazia
+  ou sem conteúdo).
+
+**Fallback entre provedores (`CompositeProvider`).** `ai.registry.ts` resolve `AI_PROVIDER` como
+principal e `AI_FALLBACK_PROVIDERS` como cadeia: com mais de um, devolve um `CompositeProvider` que
+tenta em ordem e só relança o erro se **todos** falharem. A troca de provedor acontece exatamente nas
+falhas que outro gateway resolveria — `AI_QUOTA` (cota zerada, o caso de uso do plano gratuito),
+`AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR`, gateway fora e timeout. Erro de **credencial**
+(`AI_AUTH_INVALID`) e resposta **ilegível** (`AI_BAD_RESPONSE`) não trocam de provedor: repetir com
+outra chave resolve pouco, e texto ruim não melhora. Como o fallback devolve o resultado do provedor
+que respondeu, o `provider` real fica gravado no banco (`openrouter` ou `opencode`), e o circuito do
+classificador continua sendo o abort no primeiro 429 — porém só quando a cadeia inteira falhou (§7).
 
 A integração usa `fetch` nativo, sem SDK: o contrato é uma requisição JSON documentada, e um SDK
-seria só mais uma dependência para acompanhar.
+seria só mais uma dependência para acompanhar. O Zen não cobra nada por `space-bunny-free`
+(`Authorization: Bearer public`, chave pública do próprio gateway), então o fallback é grátis por
+construção — não depende de conta nem de saldo.
 
-### 9. Agendador in-process
+### 10. Agendador in-process
 
 `node-cron` roda a coleta a cada `INGEST_CRON`, com `noOverlap` para não empilhar execuções se uma
 demorar mais que o intervalo. `ENABLE_INGEST=false` desliga.
@@ -184,7 +232,7 @@ distribuição — nenhum dos quais é necessário enquanto a coleta é um `Prom
 feeds. Quando a escala exigir, o ponto de troca é `ingestion.service.ts`; o agendador vira apenas
 um cliente da fila.
 
-### 10. Migrations em SQL com runner próprio
+### 11. Migrations em SQL com runner próprio
 
 `db/migrations/*.sql`, aplicados em ordem alfabética, cada arquivo em uma transação, com checksum
 conferido e `pg_advisory_lock` para serializar instâncias. `migrate.js` roda como job único no
@@ -193,7 +241,7 @@ Compose e o backend só sobe depois que ele termina com sucesso (`service_comple
 **Alternativa descartada:** ORM com migrations. Um ORM custaria mais do que economiza: as
 consultas são pequenas, e SQL explícito deixa visível o uso dos índices.
 
-### 11. Tratamento de erro centralizado
+### 12. Tratamento de erro centralizado
 
 Hierarquia de `AppError` com `status` e `code` (`ValidationError`, `NotFoundError`, `ConflictError`,
 `ExternalServiceError`, `TimeoutError`). O `errorHandler` normaliza tudo em
@@ -201,7 +249,7 @@ Hierarquia de `AppError` com `status` e `code` (`ValidationError`, `NotFoundErro
 cliente. Violações de unique do Postgres são traduzidas para `409` no repositório em vez de virar
 `500`.
 
-### 12. Segurança
+### 13. Segurança
 
 - `helmet` na API (sem CSP: quem serve a UI é o nginx, e a API devolve JSON e imagens de terceiros),
   `crossOriginResourcePolicy: cross-origin` para o navegador aceitar as imagens das fontes, e headers
@@ -216,7 +264,7 @@ cliente. Violações de unique do Postgres são traduzidas para `409` no reposit
 - Resposta de feed com `content-length` acima de `FEED_MAX_BYTES` é recusada antes de ler o corpo —
   um feed que se declara gigante não vira consumo de banda nem de memória.
 
-### 13. Frontend com React Query
+### 14. Frontend com React Query
 
 Componentes não conhecem a API. A cadeia é: **página → hook (`useSatelite.ts`) → função de API →
 client HTTP**. O `QueryClient` centraliza `staleTime` (30s), política de retry (não repete erro 4xx) e

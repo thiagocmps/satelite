@@ -86,6 +86,7 @@ function setup(
     minConfidence: 0.5,
     batchSize: 100,
     concurrency: 2,
+    blockSports: false,
     logger,
     ...overrides,
   });
@@ -181,6 +182,47 @@ describe('ClassificationService', () => {
     });
   });
 
+  it('conteudo esportivo sai da fila sem chamar a IA nem receber categoria', async () => {
+    const sportsArticle: PendingArticle = {
+      id: 'a-sports',
+      title: 'Flamengo vence classico e assume a lideranca do Brasileirao',
+      description: 'O time carioca venceu por 2 a 1 no Maracana.',
+      content: 'Longo texto sobre a partida para passar do piso de caracteres.',
+      categoryId: null,
+    };
+    const { service, repository, provider } = setup([sportsArticle], undefined, { blockSports: true });
+
+    const report = await service.runOnce();
+
+    expect(provider.calls).toBe(0);
+    expect(report).toMatchObject({ processed: 1, blocked: 1, aiCalls: 0, errors: 0, pending: 0 });
+    expect(repository.resolutions[0]?.verdict).toEqual({
+      categoryId: null,
+      method: null,
+      confidence: null,
+      aiClassified: false,
+    });
+  });
+
+  it('com filtro desligado o artigo esportivo segue o fluxo normal (va para a IA)', async () => {
+    const sportsArticle: PendingArticle = {
+      id: 'a-sports-2',
+      title: 'Flamengo vence classico no Maracana',
+      description: 'Gol no fim do segundo tempo garantiu a vitoria.',
+      content: 'Longo texto sobre a partida para passar do piso de caracteres.',
+      categoryId: null,
+    };
+    const { service, provider } = setup(
+      [sportsArticle],
+      () => Promise.resolve('{"categorySlug":null,"confidence":0.3}'),
+    ); // blockSports default false
+
+    const report = await service.runOnce();
+
+    expect(provider.calls).toBe(1);
+    expect(report).toMatchObject({ blocked: 0, aiCalls: 1, aiAssigned: 0 });
+  });
+
   it('falha de IA mantem o artigo pendente e registra erro', async () => {
     const { service, repository, provider } = setup(
       [ambiguousArticle],
@@ -270,6 +312,7 @@ describe('ClassificationService', () => {
       minConfidence: 0.5,
       batchSize: 100,
       concurrency: 2,
+      blockSports: true,
       logger,
     });
 
@@ -279,6 +322,7 @@ describe('ClassificationService', () => {
       processed: 0,
       resolvedKeyword: 0,
       resolvedShort: 0,
+      blocked: 0,
       aiCalls: 0,
       aiAssigned: 0,
       errors: 0,

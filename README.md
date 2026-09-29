@@ -4,6 +4,9 @@ Agregador de notícias que coleta feeds RSS/Atom públicos, guarda tudo em Postg
 oferece busca com filtros e gera **resumos por IA** sob demanda via [OpenRouter](https://openrouter.ai).
 A categorização é híbrida e explicável: regras por palavra-chave decidem primeiro, e a IA só entra
 quando a regra é ambígua ou ausente — sempre marcando quanto confia na resposta.
+Com `AI_FALLBACK_PROVIDERS=opencode`, o backend também aceita falhar sobre para o **OpenCode Zen**
+(modelos gratuitos, sem credencial) quando a cota do OpenRouter zera — a fila não fica presa ao
+reset diário.
 
 Frontend React, API Node/Express, banco PostgreSQL, stack completa em Docker Compose com um comando.
 
@@ -26,6 +29,7 @@ docker compose up --build   # http://localhost:8080
 - [Rodando localmente](#rodando-localmente)
 - [Configuração por ambiente](#configuração-por-ambiente)
 - [Configurando a OpenRouter](#configurando-a-openrouter)
+- [Fallback gratuito com OpenCode Zen](#fallback-gratuito-com-opencode-zen)
 - [Endpoints](#endpoints)
 - [Exemplos de requisição](#exemplos-de-requisição)
 - [Estrutura do banco](#estrutura-do-banco)
@@ -47,9 +51,15 @@ docker compose up --build   # http://localhost:8080
   com paginação e ordenação por data ou relevância.
 - **Categorias** criadas pela interface, com palavras-chave aplicadas automaticamente na ingestão.
   Quem casar com o título/descrição vence a categoria padrão da fonte.
+- **Sem conteúdo esportivo** (`CONTENT_FILTER_SPORTS`): uma lista curada de termos de esporte
+  (clubes, modalidades, competições) é checada na ingestão e na fila de classificação — o item é
+  descartado **antes** de entrar no banco e nunca chega à IA. Única exceção: notícia que a keyword
+  já categorizou como **Política** (ex.: proibição de bets, regras da Copa) é mantida.
 - **Classificação híbrida por IA**: quando a keyword não decide (ambigua ou ausente) e há texto
   suficiente, o artigo entra numa fila (`needs_ai`) e a IA escolhe uma das categorias reais com
-  confiança 0–1. A UI mostra "IA x%" e, no detalhe, diz se a categoria veio de regra ou de IA.
+  confiança 0–1 (piso em `AI_CLASSIFY_MIN_CONFIDENCE`; abaixo dele a categoria é descartada).
+  O prompt é few-shot com "o título manda" e "esporte → sem categoria, na dúvida → sem categoria".
+  A UI mostra "IA x%" e, no detalhe, diz se a categoria veio de regra ou de IA.
 - **Resumo por IA** por notícia, gerado sob demanda, **guardado no banco** e reutilizado
   (inclusive com versão do prompt e hash do conteúdo, para invalidar quando o texto muda).
   Sempre marcado como gerado por IA na interface.
@@ -254,10 +264,16 @@ com Zod: se algo estiver errado, a API **não sobe** e o log diz exatamente qual
 | `INGEST_TIMEOUT_MS`               | `20000`                | Timeout de cada requisição de feed                                     |
 | `FEED_MAX_BYTES`                  | `8000000`              | Tamanho máximo de um feed (8 MB)                                       |
 | `AI_PROVIDER`                     | `openrouter`           | Provedor registrado em `ai.registry.ts`                                |
+| `AI_FALLBACK_PROVIDERS`           | vazio                  | Provedores alternativos (vírgula), tentados quando o principal falha (cota/429/5xx/timeout) |
 | `OPENROUTER_API_KEY`              | —                      | Chave da OpenRouter (**obrigatório** com `AI_PROVIDER=openrouter`)     |
 | `OPENROUTER_BASE_URL`             | `https://openrouter.ai/api/v1` | Endpoint do gateway                                            |
 | `AI_MODEL`                        | `openrouter/free`      | Modelo principal                                                        |
 | `AI_FALLBACK_MODELS`              | —                      | Lista separada por vírgula, tentada em sequência quando o principal falha |
+| `OPENCODE_BASE_URL`               | `https://opencode.ai/zen/v1` | Endpoint do OpenCode Zen (gateway OpenAI-compatível)            |
+| `OPENCODE_API_KEY`                | `public`               | Chave do Zen; `public` é a do próprio gateway (sem credencial)         |
+| `OPENCODE_MODEL`                  | `space-bunny-free`     | Modelo gratuito do Zen (custo 0, aceita JSON estrito)                  |
+| `OPENCODE_FALLBACK_MODELS`        | vazio                  | Alternativas de modelo do Zen, tentadas quando o principal falha       |
+| `OPENCODE_CLASSIFY_MODEL`         | vazio (= `OPENCODE_MODEL`) | Modelo do Zen usado só para classificar                            |
 | `AI_TIMEOUT_MS`                   | `45000`                | Timeout da chamada de IA                                                |
 | `AI_MAX_RETRIES`                  | `2`                    | Tentativas por modelo (429/5xx), respeitando `Retry-After`             |
 | `AI_PROMPT_VERSION`               | `v1`                   | Versão do prompt; mudar invalida resumos antigos                       |
@@ -265,9 +281,10 @@ com Zod: se algo estiver errado, a API **não sobe** e o log diz exatamente qual
 | `AI_MAX_CONTENT_CHARS`            | `4000`                 | Limite de caracteres do texto enviado ao modelo                         |
 | `AI_CLASSIFY_ENABLED`             | `true`                 | `false` desliga a camada de IA da categorização                         |
 | `AI_CLASSIFY_MODEL`               | vazio (= `AI_MODEL`)  | Modelo usado só para classificar                                        |
-| `AI_CLASSIFY_MIN_CONFIDENCE`      | `0.5`                  | Abaixo disso a categoria da IA é descartada (confiança fica gravada)    |
+| `AI_CLASSIFY_MIN_CONFIDENCE`      | `0.6`                  | Abaixo disso a categoria da IA é descartada (confiança fica gravada)    |
 | `AI_CLASSIFY_MIN_TEXT_CHARS`      | `120`                  | Texto mínimo para a IA entrar na duvida                                |
 | `AI_CLASSIFY_BATCH` / `_CONCURRENCY` | `25` / `2`         | Lote e paralelismo de cada rodada de classificação                     |
+| `CONTENT_FILTER_SPORTS`           | `true`                 | Descarta conteúdo esportivo na ingestão e na fila de IA (título+descrição) |
 
 Variáveis só do Compose: `FRONTEND_PORT` (8080), `BACKEND_PORT` (4000), `POSTGRES_PORT` (5433),
 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
@@ -291,6 +308,28 @@ A chave **nunca** chega ao navegador: ela é lida apenas pelo backend, e o proxy
 `/api/v1`. A configuração é validada na inicialização — com `AI_PROVIDER=openrouter` e a chave
 vazia, o backend recusa subir e aponta o campo no log, em vez de aceitar tráfego e falhar só quando
 alguém pede um resumo.
+
+## Fallback gratuito com OpenCode Zen
+
+Quando a cota gratuita do OpenRouter zera (50 requisições/dia), a classificação aborta a rodada e a
+fila fica esperando o reset. Para não depender disso, acrescente um provedor alternativo gratuito:
+
+```bash
+AI_FALLBACK_PROVIDERS=opencode
+```
+
+- `opencode` = gateway **OpenCode Zen** (`https://opencode.ai/zen/v1`), OpenAI-compatível, com
+  modelos gratuitos. `space-bunny-free` (padrão) aceita o JSON estrito da classificação e escreve
+  resumos em PT, custo **0**, com a chave pública do próprio gateway (`OPENCODE_API_KEY=public`, sem
+  conta nem credencial).
+- Com o fallback ligado, o backend tenta o OpenRouter e, em cota zerada (402), limite (429), 5xx ou
+  timeout, tenta o `opencode`. Só quando **todos** falham é que a rodada aborta — o circuito de
+  segurança continua valendo.
+- O mesmo mecanismo cobre **resumo e classificação** (a troca acontece na camada de provedor; o
+  `provider` real fica gravado no banco: `openrouter` ou `opencode`).
+
+O modelo é gratuito "por tempo limitado" no Zen — como é um plano B, uma eventual indisponibilidade
+só faz a cadeia voltar ao comportamento atual (abortar na cota).
 
 ## Endpoints
 
@@ -464,6 +503,17 @@ Para outro provedor (Anthropic, OpenAI, Ollama…), implemente a interface `AiPr
 `backend/src/integrations/ai/ai.provider.ts` e registre em `ai.registry.ts`. Nenhum outro arquivo
 precisa mudar: `AI_PROVIDER` escolhe o registro.
 
+Para encadear mais de um provedor (fallback quando um zera a cota), use `AI_FALLBACK_PROVIDERS`:
+
+```bash
+AI_PROVIDER=openrouter
+AI_FALLBACK_PROVIDERS=opencode        # OpenCode Zen (grátis, sem chave)
+```
+
+Com isso o backend tenta o OpenRouter primeiro e, em cota zerada / 429 / 5xx / timeout, cai para o
+segundo. A troca é por requisição e vale tanto para resumos quanto para classificação; o `provider`
+real fica gravado no banco.
+
 ## Decisões de arquitetura
 
 **Deduplicação em três camadas.** `url_hash` por fonte pega a mesma URL re-publicada; `fingerprint`
@@ -489,7 +539,8 @@ simultâneas do mesmo artigo; se o processo reiniciar, o banco continua sendo a 
 **Falha de IA nunca vira erro de leitura.** Resumo com `status='error'` fica guardado e não é
 exposto: `GET /news` continua respondendo normalmente e a interface convida a tentar de novo. Erros
 de provedor são mapeados para códigos estáveis (`AI_QUOTA`, `AI_RATE_LIMIT`, `AI_AUTH_INVALID`…),
-com retry em 429/5xx e troca de modelo no fim da fila.
+com retry em 429/5xx e troca de modelo no fim da fila. Com `AI_FALLBACK_PROVIDERS`, a troca é por
+**provedor** (ex.: OpenRouter → OpenCode Zen): só quando toda a cadeia falha é que o erro sobe.
 
 **API sem estado.** Nenhuma sessão, nenhum dado em memória além do cache de resumo em voo: dá para
 rodar N réplicas atrás do mesmo balanceador, e a API já está preparada para isso (rate limit e
@@ -513,15 +564,20 @@ caso de o frontend rodar em outro host.
 npm test          # ou: cd backend && npx vitest run
 ```
 
-142 testes cobrindo o que mais quebra:
+181 testes cobrindo o que mais quebra:
 
 - **Normalização de RSS** — CDATA, HTML dentro dos campos, imagem por `media:content`/`media:thumbnail`,
   feeds sem autor/imagem, datas ausentes.
 - **Deduplicação** — `url_hash` e `fingerprint` já existentes, `on conflict do nothing`, contagem de
   duplicados, execução concorrente.
-- **OpenRouter** — parsing da resposta, retry em 429 respeitando `Retry-After`, fallback de modelo,
-  mapeamento de 401/402/timeout/resposta vazia, resumo em cache sem nova chamada, classificação com
-  `response_format` JSON e fallback próprio.
+- **OpenRouter / OpenAI-compatível** — parsing da resposta, retry em 429 respeitando `Retry-After`,
+  fallback de modelo, mapeamento de 401/402/timeout/resposta vazia, resumo em cache sem nova chamada,
+  classificação com `response_format` JSON e fallback próprio.
+- **OpenCode Zen** — endpoint e chave pública, modelo gratuito, JSON estrito da classificação,
+  fallback de modelo.
+- **Fallback entre provedores (`CompositeProvider`)** — cota zerada/429/5xx/timeout cai para o
+  próximo; erro de credencial ou resposta ilegível NÃO troca de provedor; cadeia inteira falhou →
+  relança o último erro (circuito do classificador preservado).
 - **Categorização** — regra por palavra-chave vence a categoria da fonte, comparação sem acento e
   sem caixa, borda de palavra (keyword dentro de outra palavra não casa), ambiguidade e ausência.
 - **Classificação por IA** — keyword decide sem custo de modelo; ambíguo/ausente chama a IA; resposta

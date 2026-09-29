@@ -27,6 +27,13 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
   const runsRepository = new PgIngestionRunsRepository(pool);
   const aiProvider = createAiProvider(env);
 
+  /** Id da categoria 'politica' (resolvido uma vez; protege politica que cita esporte). */
+  let politicaCategoryIdPromise: Promise<string | null> | null = null;
+  const politicaCategoryId = () =>
+    (politicaCategoryIdPromise ??= categoriesRepository
+      .list()
+      .then((list) => list.find((category) => category.slug === 'politica')?.id ?? null));
+
   const ingestion = new IngestionService({
     sources: sourcesRepository,
     news: newsRepository,
@@ -37,6 +44,8 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     concurrency: env.INGEST_CONCURRENCY,
     aiClassifyEnabled: env.AI_CLASSIFY_ENABLED,
     minClassifyTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
+    blockSports: env.CONTENT_FILTER_SPORTS,
+    politicaCategoryId,
   });
 
   const classification = new ClassificationService({
@@ -51,6 +60,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
     batchSize: env.AI_CLASSIFY_BATCH,
     concurrency: env.AI_CLASSIFY_CONCURRENCY,
+    blockSports: env.CONTENT_FILTER_SPORTS,
     logger,
   });
 

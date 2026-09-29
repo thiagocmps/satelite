@@ -23,6 +23,18 @@ describe('buildClassifyMessages', () => {
     expect(user?.content).toContain('- ciencia: Ciencia');
     expect(user?.content).toContain('Titulo: Foguete decola');
   });
+
+  it('instrui o modelo a nunca classificar esporte e a devolver null na duvida', () => {
+    const [system] = buildClassifyMessages(input, { language: 'pt-BR', maxContentChars: 500 });
+    expect(system?.content).toMatch(/ESPORTIVO/i);
+    expect(system?.content).toContain('categorySlug: null');
+    expect(system?.content).toContain('Flamengo'); // exemplo few-shot de esporte -> null
+  });
+
+  it('diz que o titulo e a fonte principal da decisao', () => {
+    const [system] = buildClassifyMessages(input, { language: 'pt-BR', maxContentChars: 500 });
+    expect(system?.content).toMatch(/TITULO[^.]*fonte principal/i);
+  });
 });
 
 describe('parseClassifiedContent', () => {
