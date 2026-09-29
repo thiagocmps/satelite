@@ -256,3 +256,30 @@ Padrão para dublês: interface do repositório + classe em memória que guarda 
 | Nova rota                              | `*.routes.ts` + `*.controller.ts` + `routes/index.ts`            |
 | Novo tema/cor                          | `styles/tokens.css`                                             |
 | Novo item de menu                      | `components/Layout.tsx` + rota em `main.tsx`                    |
+
+## 13. PWA (instalável no celular)
+
+O frontend é uma PWA via `vite-plugin-pwa` (`frontend/vite.config.ts`):
+
+- **Manifest**: nome, `display: standalone`, `start_url: /`, `theme_color` (clair/escuro) e ícones
+  192/512/maskable gerados de `frontend/public/pwa-source.svg` com `@vite-pwa/assets-generator`
+  (preset `minimal`). Os PNGs gerados ficam commitados em `frontend/public/`; para regenerar:
+  `npx @vite-pwa/assets-generator public/pwa-source.svg -p minimal`.
+- **Service worker** (`generateSW`): pré-cache do app-shell, `navigateFallback: /index.html` com
+  denylist `/api`, e runtime cache `NetworkFirst` (5 s de timeout, 5 min de TTL) só para leituras de
+  `/api/v1/news` — o app abre offline com a lista já carregada.
+- **Registro**: `injectRegister: 'auto'` injeta `registerSW.js` no HTML final; atualização
+  automática (`registerType: 'autoUpdate'`).
+- **nginx**: `manifest.webmanifest` com `Content-Type: application/manifest+json` e cache curto;
+  `sw.js` com `Cache-Control: no-cache` (revalidação na próxima visita). Ícones seguem o cache de
+  7 dias dos assets estáticos.
+- **HTTPS é pré-requisito do navegador para instalar**. No servidor com Tailscale:
+  `tailscale serve --bg https / http://127.0.0.1:8080` (porta do `FRONTEND_PORT`).
+
+Verificação rápida após build:
+
+```bash
+curl -sI http://localhost:8080/sw.js | grep -i cache-control
+curl -s http://localhost:8080/manifest.webmanifest
+curl -s http://localhost:8080/ | grep -o 'register-sw'
+```

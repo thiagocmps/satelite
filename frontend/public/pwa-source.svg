@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e3a8a"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- anel orbital sutil ao fundo -->
+  <ellipse cx="512" cy="524" rx="352" ry="150" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="24" transform="rotate(-26 512 524)"/>
+  <!-- monograma S: arco superior (empola p/ a esquerda) + arco inferior (empola p/ a direita) -->
+  <path d="M 520 196 A 162 162 0 0 0 520 492" fill="none" stroke="#ffffff" stroke-width="118" stroke-linecap="round"/>
+  <path d="M 520 508 A 162 162 0 0 1 520 804" fill="none" stroke="#ffffff" stroke-width="118" stroke-linecap="round"/>
+  <!-- satelite pontual no anel -->
+  <circle cx="206" cy="739" r="30" fill="#ffffff" fill-opacity="0.9"/>
+  <circle cx="778" cy="319" r="20" fill="#ffffff" fill-opacity="0.55"/>
+</svg>

@@ -22,6 +22,7 @@ docker compose up --build   # http://localhost:8080
 - [Estrutura de pastas](#estrutura-de-pastas)
 - [Pré-requisitos](#pré-requisitos)
 - [Rodando com Docker](#rodando-com-docker)
+- [Instalando no celular (PWA)](#instalando-no-celular-pwa)
 - [Rodando localmente](#rodando-localmente)
 - [Configuração por ambiente](#configuração-por-ambiente)
 - [Configurando a OpenRouter](#configurando-a-openrouter)
@@ -54,6 +55,8 @@ docker compose up --build   # http://localhost:8080
   Sempre marcado como gerado por IA na interface.
 - **Administração** de fontes e categorias pela própria interface web.
 - **Saúde da coleta**: histórico por execução e por fonte, com erro, status HTTP e contagem de duplicados.
+- **Instalável no celular (PWA)**: manifest + service worker + ícones — dá para “Adicionar à tela
+  inicial” / “Instalar app” no Android e iOS (requer HTTPS).
 
 ## Stack
 
@@ -178,6 +181,30 @@ docker compose down -v              # apaga também o volume do banco
 
 > O `.env` **não** é montado dentro dos containers: ele apenas preenche as variáveis declaradas no
 > bloco `environment:` do Compose. Nenhum arquivo de credencial entra na imagem.
+
+## Instalando no celular (PWA)
+
+O frontend é uma **PWA**: tem manifest (`/manifest.webmanifest`), service worker com pré-cache do
+app-shell e ícones em vários tamanhos. No navegador do celular basta **“Adicionar à tela inicial”**
+(Android/iOS) ou **“Instalar app”** (Chrome).
+
+O navegador só oferece a instalação em **HTTPS**. A forma mais simples de expor o app pelo celular
+com HTTPS é o `tailscale serve` no servidor (certificado automático do tailnet; o aparelho precisa
+estar na mesma rede Tailscale):
+
+```bash
+# no servidor, aponta o HTTPS publico do tailnet para o frontend local
+tailscale serve --bg https / http://127.0.0.1:8080
+```
+
+- Ajuste a porta para a do `FRONTEND_PORT` se você não usa o padrão (8080).
+- Abra `https://<nome-do-host>.<seu-tailnet>.ts.net/` no celular e instale.
+- A atualização do app é automática (`registerType: autoUpdate`): o service worker revalida na
+  próxima visita e troca a versão do shell.
+- **Offline**: o shell abre sem rede; a lista de notícias já carregada fica visível por alguns
+  minutos (rede primeiro, cache curto como fallback). O restante depende de conexão.
+- Se preferir um domínio próprio, o mesmo requisito vale: sirva o frontend por HTTPS (Caddy/nginx +
+  Let's Encrypt) apontando para a porta do frontend, mantendo o proxy de `/api` do próprio nginx.
 
 ## Rodando localmente
 
