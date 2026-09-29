@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api/satelite.api';
-import type { NewsFilters, SourcesImportReport } from '../api/types';
+import type { ClassificationReport, NewsFilters, SourcesImportReport } from '../api/types';
 
 /**
  * Hooks = unico lugar do frontend que conhece a API. Componentes so consomem
@@ -155,6 +155,28 @@ export function useIngestNow() {
       void queryClient.invalidateQueries({ queryKey: sourcesKeys.runs });
       void queryClient.invalidateQueries({ queryKey: sourcesKeys.all });
       void queryClient.invalidateQueries({ queryKey: ['news'] });
+    },
+  });
+}
+
+export const classificationKeys = {
+  status: ['classification', 'status'] as const,
+};
+
+/** Quantos artigos aguardam a IA (fila needs_ai). */
+export function useClassificationStatus() {
+  return useQuery({ queryKey: classificationKeys.status, queryFn: api.fetchClassificationStatus });
+}
+
+/** Dispara a classificacao dos pendentes; atualiza a fila e a listagem. */
+export function useRunClassification(onSuccess?: (report: ClassificationReport) => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.runClassification(),
+    onSuccess: (response) => {
+      void queryClient.invalidateQueries({ queryKey: classificationKeys.status });
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      onSuccess?.(response.data);
     },
   });
 }

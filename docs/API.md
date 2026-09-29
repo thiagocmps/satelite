@@ -37,7 +37,7 @@ requisição.
 | -------------------- | ------ | ---------------------------------------------------------------- |
 | `VALIDATION_ERROR`   | 400    | Query, param ou body inválido (`details.issues` detalha)         |
 | `NOT_FOUND`          | 404    | Notícia, categoria, fonte ou rota inexistente                    |
-| `CONFLICT`           | 409    | Slug já existente ou ingestão já em andamento                    |
+| `CONFLICT`           | 409    | Slug já existente ou ingestão/classificação já em andamento      |
 | `RATE_LIMITED`       | 429    | Estourou o limite de requisições                                 |
 | `TIMEOUT`            | 504    | Timeout na coleta do feed ou na chamada de IA                    |
 | `FEED_HTTP_ERROR`    | 502    | Feed respondeu com status não-2xx                                 |
@@ -83,6 +83,8 @@ type Article = {
   ingestedAt: string;
   source: SourceRef;
   category: CategoryRef | null;
+  categoryMethod: 'keyword' | 'ai' | null;  // origem da categoria (null = padrao da fonte)
+  categoryConfidence: number | null;        // 0..1, so quando categoryMethod === 'ai'
   summary: SummaryView | null;   // já vem na listagem (lateral join)
 };
 
@@ -495,6 +497,58 @@ Histórico, mais recente primeiro.
     }
   ]
 }
+```
+
+---
+
+## Classificação por IA
+
+Camada explicável sobre a keyword: a regra determinística continua decidindo
+primeiro (e sempre), e a IA (OpenRouter) só entra quando a keyword é **ambígua**
+(≥ 2 categorias) ou **ausente**, com texto de pelo menos
+`AI_CLASSIFY_MIN_TEXT_CHARS` caracteres. O veredito da IA é gravado direto em
+`articles.category_id` com `category_method = 'ai'` e a confiança em
+`category_confidence` (0–1). Abaixo de `AI_CLASSIFY_MIN_CONFIDENCE` a categoria
+não é aplicada, mas a confiança fica registrada (a UI mostra "IA x%").
+
+A fila é a coluna `articles.needs_ai`: a ingestão marca artigos sem decisão
+determinística, e a migration `004` marcou os últimos 30 dias. Falha de IA
+**mantém o artigo pendente** para a próxima rodada.
+
+### `POST /ingest/classify` → `200`
+
+Processa a fila (lote de `AI_CLASSIFY_BATCH`, concorrência `AI_CLASSIFY_CONCURRENCY`)
+e devolve o relatório. `409 CONFLICT` se já houver uma rodada em andamento.
+
+```bash
+curl -X POST http://localhost:4000/api/v1/ingest/classify
+```
+
+```json
+{
+  "data": {
+    "processed": 25,
+    "resolvedKeyword": 9,
+    "resolvedShort": 2,
+    "aiCalls": 14,
+    "aiAssigned": 11,
+    "errors": 3,
+    "pending": 3
+  }
+}
+```
+
+- `resolvedKeyword`: saiu da fila por regra (sem custo de modelo).
+- `resolvedShort`: sem decisão determinística, texto curto demais — fica como estava.
+- `aiCalls` / `aiAssigned`: chamadas de modelo / categorias efetivamente aplicadas.
+- `errors`: falhas (IA ou banco) — esses artigos continuam em `needs_ai`.
+
+### `GET /ingest/classify/status` → `200`
+
+Quantos artigos aguardando a IA.
+
+```json
+{ "data": { "pending": 3 } }
 ```
 
 ---

@@ -22,7 +22,7 @@ artefato estático.
 ```
 fonte RSS ──GET condicional──> rss.adapter ──parse──> rss.normalize ──> articles (PG)
                                     │                       │
-                                    │                       └── category-matcher (regras)
+                                    │                       └── keyword-engine (regras) ──> IA (OpenRouter, só na dúvida) ──> articles
                                     └── ingestion_runs (saúde por execução)
                                                                         │
 articles (PG) ──GET /news──> API ──proxy /api──> nginx ──> React ──clique──> POST /news/:id/summary
@@ -110,18 +110,22 @@ coleta de uma fonte os dois campos vêm vazios, então o servidor responde o con
 **Alternativa descartada:** coletar sempre e descartar duplicado no banco. Multiplica banda e tempo
 de parsing para descartar exatamente o que já temos.
 
-### 6. Categorização por palavra-chave
+### 6. Categorização por palavra-chave (camada determinística)
 
-`category_rules` guarda `(category_id, keyword)`. Na ingestão, o título/descrição é normalizado
-(minúsculas, sem acento) e comparado por `includes`. A regra que casar define a categoria; sem
-casamento, vale a categoria padrão da fonte (ou nenhuma).
+`category_rules` guarda `(category_id, keyword)`. Na ingestão, o **título + descrição** é
+normalizado (minúsculas, sem acento, espaços únicos) e comparado com borda de palavra (a keyword
+precisa ficar isolada — “nasa” não casa em “nasal”). O conteúdo do artigo **não** entra nesta camada,
+para a keyword não decidir por uma palavra enterrada no corpo da notícia.
 
 A comparação normaliza os dois lados e ordena da palavra mais específica para a mais genérica, para
-que “mercado financeiro” ganhe de “mercado”.
+que “mercado financeiro” ganhe de “mercado”. Resultados possíveis:
 
-**Alternativa descartada:** classificar por IA. Custa uma chamada por artigo para algo que o
-resultado final (ler a notícia) não exige, e o resultado seria menos previsível que uma regra
-auditável. Se um dia for necessário, a regra continua sendo o piso e a IA vira o segundo estágio.
+- **uma categoria casa** → decisão forte: `category_method='keyword'`, sem custo de modelo;
+- **mais de uma casa** (ambíguo) ou **nenhuma** → sem decisão determinística.
+
+Sem decisão e com texto suficiente (`AI_CLASSIFY_MIN_TEXT_CHARS`), o artigo entra na fila
+`articles.needs_ai` e o **segundo estágio** (IA) decide; texto curto demais sai da fila como está
+(vale a categoria padrão da fonte ou nenhuma).
 
 ### 7. Resumo por IA sob demanda, cacheado
 

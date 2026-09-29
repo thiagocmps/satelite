@@ -23,6 +23,11 @@ export function NewsCard({ article }: Props) {
           {article.category ? (
             <span className="badge badge--category">{article.category.name}</span>
           ) : null}
+          {article.categoryMethod === 'ai' ? (
+            <span className="badge badge--ai" title="Categoria atribuida por IA">
+              ✦ IA {article.categoryConfidence != null ? `${Math.round(article.categoryConfidence * 100)}%` : ''}
+            </span>
+          ) : null}
           {article.summary ? <span className="badge badge--ai">✦ resumo IA</span> : null}
         </div>
 

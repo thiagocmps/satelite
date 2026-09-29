@@ -2,6 +2,8 @@
 
 Agregador de notícias que coleta feeds RSS/Atom públicos, guarda tudo em PostgreSQL sem duplicar,
 oferece busca com filtros e gera **resumos por IA** sob demanda via [OpenRouter](https://openrouter.ai).
+A categorização é híbrida e explicável: regras por palavra-chave decidem primeiro, e a IA só entra
+quando a regra é ambígua ou ausente — sempre marcando quanto confia na resposta.
 
 Frontend React, API Node/Express, banco PostgreSQL, stack completa em Docker Compose com um comando.
 
@@ -44,6 +46,9 @@ docker compose up --build   # http://localhost:8080
   com paginação e ordenação por data ou relevância.
 - **Categorias** criadas pela interface, com palavras-chave aplicadas automaticamente na ingestão.
   Quem casar com o título/descrição vence a categoria padrão da fonte.
+- **Classificação híbrida por IA**: quando a keyword não decide (ambigua ou ausente) e há texto
+  suficiente, o artigo entra numa fila (`needs_ai`) e a IA escolhe uma das categorias reais com
+  confiança 0–1. A UI mostra "IA x%" e, no detalhe, diz se a categoria veio de regra ou de IA.
 - **Resumo por IA** por notícia, gerado sob demanda, **guardado no banco** e reutilizado
   (inclusive com versão do prompt e hash do conteúdo, para invalidar quando o texto muda).
   Sempre marcado como gerado por IA na interface.
@@ -73,7 +78,8 @@ agendador in-process cobrem com folga, e o desenho já permite plugar esses comp
           ▼
    ┌──────────────────────────────────────────────┐
    │  rss.adapter → rss.normalize                │   HTML limpo, imagem, autor, datas
-   │  ingestion.service → category-matcher       │   regra por palavra-chave
+   │  ingestion.service → keyword-engine         │   regra por palavra-chave (borda de palavra)
+   │  classification.service → IA (só na duvida) │   fila needs_ai → OpenRouter → category_method
    └──────────────────────────────────────────────┘
           │  INSERT … ON CONFLICT DO NOTHING
           ▼
@@ -230,6 +236,11 @@ com Zod: se algo estiver errado, a API **não sobe** e o log diz exatamente qual
 | `AI_PROMPT_VERSION`               | `v1`                   | Versão do prompt; mudar invalida resumos antigos                       |
 | `AI_LANGUAGE`                     | `pt-BR`                | Idioma pedido no resumo                                                |
 | `AI_MAX_CONTENT_CHARS`            | `4000`                 | Limite de caracteres do texto enviado ao modelo                         |
+| `AI_CLASSIFY_ENABLED`             | `true`                 | `false` desliga a camada de IA da categorização                         |
+| `AI_CLASSIFY_MODEL`               | vazio (= `AI_MODEL`)  | Modelo usado só para classificar                                        |
+| `AI_CLASSIFY_MIN_CONFIDENCE`      | `0.5`                  | Abaixo disso a categoria da IA é descartada (confiança fica gravada)    |
+| `AI_CLASSIFY_MIN_TEXT_CHARS`      | `120`                  | Texto mínimo para a IA entrar na duvida                                |
+| `AI_CLASSIFY_BATCH` / `_CONCURRENCY` | `25` / `2`         | Lote e paralelismo de cada rodada de classificação                     |
 
 Variáveis só do Compose: `FRONTEND_PORT` (8080), `BACKEND_PORT` (4000), `POSTGRES_PORT` (5433),
 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
@@ -282,6 +293,8 @@ Base: `/api/v1`. Respostas de sucesso usam `{ "data": ... }`; listas acrescentam
 | `POST` | `/sources/:id/ingest`         | Coleta só essa fonte                                    |
 | `POST` | `/ingest/run`                 | Coleta todas as fontes ativas                           |
 | `GET`  | `/ingest/runs`                | Histórico de execuções                                  |
+| `POST` | `/ingest/classify`            | Classifica com IA os artigos da fila (`needs_ai`)       |
+| `GET`  | `/ingest/classify/status`     | Quantos artigos aguardando a IA                        |
 
 Parâmetros de `GET /news`: `q`, `category` (uuid), `source` (uuid), `from`, `to` (`YYYY-MM-DD`),
 `page` (≥1), `limit` (1–50, padrão 12), `sort` (`recent` | `relevance`).
@@ -473,16 +486,20 @@ caso de o frontend rodar em outro host.
 npm test          # ou: cd backend && npx vitest run
 ```
 
-84 testes cobrindo o que mais quebra:
+142 testes cobrindo o que mais quebra:
 
 - **Normalização de RSS** — CDATA, HTML dentro dos campos, imagem por `media:content`/`media:thumbnail`,
   feeds sem autor/imagem, datas ausentes.
 - **Deduplicação** — `url_hash` e `fingerprint` já existentes, `on conflict do nothing`, contagem de
   duplicados, execução concorrente.
 - **OpenRouter** — parsing da resposta, retry em 429 respeitando `Retry-After`, fallback de modelo,
-  mapeamento de 401/402/timeout/resposta vazia, resumo em cache sem nova chamada.
+  mapeamento de 401/402/timeout/resposta vazia, resumo em cache sem nova chamada, classificação com
+  `response_format` JSON e fallback próprio.
 - **Categorização** — regra por palavra-chave vence a categoria da fonte, comparação sem acento e
-  sem caixa, palavra mais específica primeiro.
+  sem caixa, borda de palavra (keyword dentro de outra palavra não casa), ambiguidade e ausência.
+- **Classificação por IA** — keyword decide sem custo de modelo; ambíguo/ausente chama a IA; resposta
+  ilegível ou abaixo da confiança mínima não aplica categoria; falha mantém o artigo na fila;
+  execução concorrente recusada; allowlist de slugs (a IA nunca inventa categoria).
 - **Rotas** — `supertest` sobre o app: validação, 404, paginação, limite de `limit`, envelope de erro.
 - **Repositórios** — tradução de violação de unique em `409` em vez de erro interno.
 

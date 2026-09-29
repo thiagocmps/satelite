@@ -13,6 +13,10 @@ const config = (overrides: Partial<OpenRouterConfig> = {}): OpenRouterConfig => 
   maxContentChars: 500,
   appUrl: 'http://localhost:8080',
   appName: 'Satelite',
+  classifyModel: '',
+  classifyFallbackModels: [],
+  classifyTimeoutMs: 5_000,
+  classifyMaxRetries: 1,
   ...overrides,
 });
 
@@ -134,5 +138,48 @@ describe('OpenRouterProvider', () => {
     fetchMock.mockRejectedValue(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
 
     await expect(new OpenRouterProvider(config({ maxRetries: 0, fallbackModels: [] })).summarize(input)).rejects.toBeInstanceOf(TimeoutError);
+  });
+});
+
+describe('OpenRouterProvider.classify', () => {
+  const classifyInput = {
+    title: 'Foguete decola',
+    description: null,
+    content: 'Missao a orbita lunar com nova capsula.',
+    categories: [
+      { slug: 'tecnologia', name: 'Tecnologia' },
+      { slug: 'ciencia', name: 'Ciencia' },
+    ],
+  };
+
+  it('pede JSON estrito (sem temperatura) e devolve o texto do modelo', async () => {
+    fetchMock.mockResolvedValue(completion('{"categorySlug":"ciencia","confidence":0.9}'));
+
+    const result = await new OpenRouterProvider(config()).classify(classifyInput);
+
+    expect(result.text).toBe('{"categorySlug":"ciencia","confidence":0.9}');
+    const body = lastBody();
+    expect(body).toMatchObject({ model: 'openrouter/free', temperature: 0, response_format: { type: 'json_object' } });
+  });
+
+  it('usa AI_CLASSIFY_MODEL quando configurado', async () => {
+    fetchMock.mockResolvedValue(completion('{"categorySlug":null,"confidence":0.2}'));
+
+    await new OpenRouterProvider(config({ classifyModel: 'meta-llama/llama-4-scout:free' })).classify(classifyInput);
+
+    expect(lastBody().model).toBe('meta-llama/llama-4-scout:free');
+  });
+
+  it('cai para o fallback de classificacao quando o principal falha com 429', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 429, headers: new Headers(), text: async () => '{"error":{"message":"lotado"}}' })
+      .mockResolvedValueOnce(completion('{"categorySlug":"tecnologia","confidence":0.8}'));
+
+    const result = await new OpenRouterProvider(
+      config({ classifyModel: 'a', classifyFallbackModels: ['b'], classifyMaxRetries: 0 }),
+    ).classify(classifyInput);
+
+    expect(result.text).toContain('"categorySlug":"tecnologia"');
+    expect(lastBody().model).toBe('b');
   });
 });

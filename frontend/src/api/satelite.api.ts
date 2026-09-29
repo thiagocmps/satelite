@@ -4,6 +4,8 @@ import type {
   Article,
   Category,
   CategoryRule,
+  ClassificationReport,
+  ClassificationStatus,
   IngestionReport,
   IngestionRun,
   NewsFilters,
@@ -92,4 +94,14 @@ export function runIngestion(): Promise<{ data: IngestionReport }> {
 
 export function fetchIngestionRuns(limit = 20): Promise<{ data: IngestionRun[] }> {
   return api.get<{ data: IngestionRun[] }>(`/ingest/runs?limit=${limit}`);
+}
+
+/* ---------------------------------------------------- classificacao por IA */
+
+export function runClassification(): Promise<{ data: ClassificationReport }> {
+  return api.post<{ data: ClassificationReport }>('/ingest/classify');
+}
+
+export function fetchClassificationStatus(): Promise<{ data: ClassificationStatus }> {
+  return api.get<{ data: ClassificationStatus }>('/ingest/classify/status');
 }

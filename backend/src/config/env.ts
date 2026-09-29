@@ -63,6 +63,19 @@ const schema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(45_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_MAX_CONTENT_CHARS: z.coerce.number().int().min(200).max(100_000).default(4_000),
+
+    // Classificacao hibrida: a IA so entra quando a keyword nao decide.
+    AI_CLASSIFY_ENABLED: bool(true),
+    // Vazio = reusa o modelo de resumo (AI_MODEL).
+    AI_CLASSIFY_MODEL: z.string().default(''),
+    AI_CLASSIFY_FALLBACK_MODELS: csv(z.string().min(1)),
+    AI_CLASSIFY_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(45_000),
+    AI_CLASSIFY_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+    AI_CLASSIFY_BATCH: z.coerce.number().int().min(1).max(500).default(25),
+    AI_CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
+    AI_CLASSIFY_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.5),
+    AI_CLASSIFY_MIN_TEXT_CHARS: z.coerce.number().int().min(0).default(120),
+
     OPENROUTER_API_KEY: z.string().default(''),
     OPENROUTER_BASE_URL: url().default('https://openrouter.ai/api/v1'),
   })

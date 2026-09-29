@@ -70,6 +70,8 @@ function setup(overrides: Partial<IngestionDeps> = {}) {
     listRules: async () => [],
     logger,
     concurrency: 2,
+    aiClassifyEnabled: true,
+    minClassifyTextChars: 120,
     ...overrides,
   };
 
@@ -178,6 +180,46 @@ describe('IngestionService.ingestSource', () => {
     expect(captured).toEqual([
       { title: 'Inteligencia artificial avanca', categoryId: 'cat-tec' },
       { title: 'Outro tema', categoryId: 'cat-geral' },
+    ]);
+  });
+
+  it('keyword no corpo da noticia NAO decide categoria (escopo titulo+descricao)', async () => {
+    const captured: Array<{ title: string; categoryId: string | null; needsAi: boolean }> = [];
+
+    const { service } = setup({
+      listRules: async () => [{ categoryId: 'cat-politica', keyword: 'governo' }],
+      minClassifyTextChars: 1,
+      loadFeed: async () => ({
+        notModified: false,
+        status: 200,
+        etag: null,
+        lastModified: null,
+        items: [
+          {
+            title: 'TJMT retoma expediente e mantem prazos suspensos',
+            link: 'https://exemplo.com/tjmt',
+            isoDate: '2026-09-28T10:00:00Z',
+            contentSnippet: 'O Poder Judiciario de Mato Grosso retomou o expediente.',
+            contentEncoded: 'Corpo do texto com a palavra governo apenas aqui dentro, fora do titulo e da descricao.',
+          },
+        ],
+      }),
+      news: {
+        list: async () => ({ data: [], pagination: { page: 1, limit: 1, total: 0, totalPages: 0, hasNext: false, hasPrev: false } }),
+        findById: async () => null,
+        insertMany: async (articles) => {
+          captured.push(...articles.map((a) => ({ title: a.title, categoryId: a.categoryId, needsAi: a.needsAi })));
+          return { inserted: articles.length, duplicates: 0 };
+        },
+      },
+    });
+
+    await service.ingestSource(g1);
+
+    // a keyword "governo" so existe no corpo: nao decide (categoria = padrao da
+    // fonte, null) e o artigo vai para a fila da IA por ter texto suficiente.
+    expect(captured).toEqual([
+      { title: 'TJMT retoma expediente e mantem prazos suspensos', categoryId: null, needsAi: true },
     ]);
   });
 });

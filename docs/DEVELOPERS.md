@@ -54,7 +54,7 @@ Detalhes que só aparecem na prática: o `rss-parser` lowercifica os nomes das t
 1. Guarda a execução em `ingestion_runs` com `status='running'`.
 2. Chama o adapter. Em `304`, marca `not_modified` e devolve.
 3. Normaliza cada item (próxima seção) e filtra o que não tem título ou link.
-4. Classifica com `category-matcher`.
+4. Classifica com `keyword-engine` e marca `needs_ai` quando a regra não decide.
 5. Insere em lote (`news.repository.ts#insertMany`), blocos de 400 linhas.
 6. Atualiza a linha da fonte com `etag`, `last_modified`, `last_status` e `last_error`.
 
@@ -94,15 +94,26 @@ duplicados. Nenhuma consulta de verificação antes: o banco decide.
 
 ### 5. Categorização
 
-`backend/src/modules/ingestion/category-matcher.ts`
+`backend/src/modules/classification/keyword-engine.ts` (regras) +
+`backend/src/modules/classification/classification.service.ts` (fila de IA)
 
 ```ts
-resolveCategory(title, description, defaultCategoryId, rules) → categoryId | null
+classifyText(text, index)
+  → { decision: 'decisive', match } | { decision: 'ambiguous', matches } | { decision: 'none' }
 ```
 
-Título e descrição são normalizados (minúsculas, sem acento) e comparados com `includes`. As regras
-vêm ordenadas da palavra mais longa para a mais curta, para que a mais específica vença a genérica.
-Sem casamento, vale `defaultCategoryId` da fonte.
+O motor deterministico normaliza o texto (minusculas, sem acento, espacos colapsados) e exige
+**borda de palavra**: `nasa` nao casa dentro de `nasal`. O indice vem da palavra mais longa para a
+mais curta (a mais especifica vence por categoria). Sem decisao deterministica e com texto de pelo
+menos `AI_CLASSIFY_MIN_TEXT_CHARS`, o item entra na fila `needs_ai`.
+
+`classification.service.ts` processa a fila: quem a regra decide sai sem custo de modelo; texto curto
+demais fica como esta; o resto vai para a IA (OpenRouter, `classify` com `response_format:
+json_object`) com o catalogo real de categorias (slug + nome). O modelo responde
+`{"categorySlug", "confidence"}`; slug fora do catalogo ou confianca abaixo de
+`AI_CLASSIFY_MIN_CONFIDENCE` nao aplica categoria. O veredito grava `category_method`
+(`'keyword'`/`'ai'`) e `category_confidence` direto em `articles`. Falha de IA mantem `needs_ai`
+para a proxima rodada. Dispare `POST /ingest/classify` (ou o botao em Fontes).
 
 ### 6. Persistência e leitura
 
@@ -221,8 +232,10 @@ cd backend && npx vitest run -t "dedup"          # por nome
 | --------------------------------------------------- | -------------------------------------------------------- |
 | `core/html.test.ts`                                  | limpeza de HTML, entidades, CDATA                        |
 | `integrations/rss/rss.normalize.test.ts`             | imagens, autores, datas, feeds incompletos               |
-| `integrations/ai/openrouter.provider.test.ts`        | retry, fallback, mapeamento de erro, cache               |
-| `modules/ingestion/category-matcher.test.ts`         | regras, acento, precedência da palavra mais específica   |
+| `integrations/ai/openrouter.provider.test.ts`        | retry, fallback, mapeamento de erro, cache, classify     |
+| `integrations/ai/ai.classify.test.ts`                | prompt do catalogo, parsing e allowlist de slugs         |
+| `modules/classification/keyword-engine.test.ts`      | regras, acento, borda de palavra, ambiguidade            |
+| `modules/classification/classification.service.test.ts` | fila: keyword sem custo, IA na duvida, falha pendente |
 | `modules/ingestion/ingestion.service.test.ts`        | dedup, contagens, fonte que falha não derruba as outras   |
 | `modules/summaries/summaries.service.test.ts`        | cache, `input_hash`, chamada concorrente                 |
 | `modules/sources/sources.repository.test.ts`         | violação de unique → 409                                 |

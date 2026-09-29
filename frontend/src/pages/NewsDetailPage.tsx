@@ -45,6 +45,15 @@ export function NewsDetailPage() {
               <div className="detail__meta" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
                 <strong>{data.source.name}</strong>
                 {data.category ? <span className="badge badge--category">{data.category.name}</span> : null}
+                {data.categoryMethod === 'ai' ? (
+                  <span className="faint small" title="Categoria atribuida por IA (OpenRouter)">
+                    por IA{' '}
+                    {data.categoryConfidence != null ? `${Math.round(data.categoryConfidence * 100)}% de confianca` : ''}
+                  </span>
+                ) : null}
+                {data.categoryMethod === 'keyword' ? (
+                  <span className="faint small">por palavra-chave</span>
+                ) : null}
                 <time dateTime={data.publishedAt}>{formatDateTime(data.publishedAt)}</time>
                 {data.author ? <span>por {data.author}</span> : null}
               </div>

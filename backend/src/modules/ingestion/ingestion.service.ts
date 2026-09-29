@@ -2,10 +2,10 @@ import type { Logger } from '../../config/logger.js';
 import { ConflictError, errorMessage } from '../../core/errors.js';
 import type { FeedLoader } from '../../integrations/rss/rss.types.js';
 import { normalizeItem } from '../../integrations/rss/rss.normalize.js';
+import { buildArticleText, buildKeywordIndex, buildKeywordText, classifyText, type KeywordIndex } from '../classification/keyword-engine.js';
 import type { NewsRepository } from '../news/news.repository.js';
 import type { SourcesRepository } from '../sources/sources.repository.js';
 import type { SourceRecord } from '../sources/sources.types.js';
-import { buildCategoryIndex, matchCategory, type CategoryRuleEntry } from './category-matcher.js';
 import type { IngestionRunsRepository } from './ingestion.repository.js';
 
 export type SourceIngestionResult = {
@@ -37,6 +37,10 @@ export type IngestionDeps = {
   listRules: () => Promise<{ categoryId: string; keyword: string }[]>;
   logger: Logger;
   concurrency: number;
+  /** Fila de classificacao por IA ligada (AI_CLASSIFY_ENABLED). */
+  aiClassifyEnabled: boolean;
+  /** Tamanho minimo de texto para a IA entrar na duvida. */
+  minClassifyTextChars: number;
 };
 
 /**
@@ -59,7 +63,7 @@ export class IngestionService {
 
     try {
       const sources = await this.deps.sources.listEnabled();
-      const index = buildCategoryIndex(await this.deps.listRules());
+      const index = buildKeywordIndex(await this.deps.listRules());
       const results: SourceIngestionResult[] = [];
       let cursor = 0;
       const next = (): SourceRecord | undefined => {
@@ -105,7 +109,7 @@ export class IngestionService {
     }
   }
 
-  async ingestSource(source: SourceRecord, index?: CategoryRuleEntry[]): Promise<SourceIngestionResult> {
+  async ingestSource(source: SourceRecord, index?: KeywordIndex): Promise<SourceIngestionResult> {
     const runId = await this.deps.runs.start(source.id);
 
     try {
@@ -121,15 +125,29 @@ export class IngestionService {
         return { sourceId: source.id, slug: source.slug, name: source.name, status: 'not_modified', fetched: 0, inserted: 0, duplicates: 0 };
       }
 
-      const rules = index ?? buildCategoryIndex(await this.deps.listRules());
+      const rules = index ?? buildKeywordIndex(await this.deps.listRules());
       const normalized = feed.items
         .map((item) => normalizeItem(item, source))
         .filter((article): article is NonNullable<typeof article> => article !== null)
-        .map((article) => ({
-          ...article,
-          // regra por palavra-chave tem precedencia; a categoria padrao da fonte e o fallback
-          categoryId: matchCategory(`${article.title} ${article.description ?? ''}`, rules) ?? article.categoryId,
-        }));
+        .map((article) => {
+          // A keyword casa apenas em titulo+descricao: palavra-chave enterrada no
+          // corpo da noticia nao decide categoria (evita falsos positivos).
+          const keywordText = buildKeywordText(article);
+          const result = classifyText(keywordText, rules);
+          // o texto completo e o que a IA tem de material para decidir
+          const fullText = buildArticleText(article);
+          // regra por palavra-chave tem precedencia; o padrao da fonte e o fallback.
+          // Sem decisao deterministica + texto suficiente, o artigo entra na fila da IA.
+          return {
+            ...article,
+            categoryId: result.decision === 'decisive' ? result.match.categoryId : article.categoryId,
+            needsAi:
+              this.deps.aiClassifyEnabled &&
+              result.decision !== 'decisive' &&
+              fullText.length >= this.deps.minClassifyTextChars,
+            categoryMethod: result.decision === 'decisive' ? ('keyword' as const) : null,
+          };
+        });
 
       const { inserted, duplicates } = await this.deps.news.insertMany(normalized);
 

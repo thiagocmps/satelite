@@ -85,5 +85,7 @@ export function normalizeItem(item: RawItem, source: SourceRecord, now = new Dat
     urlHash: urlHash(url),
     fingerprint: titleFingerprint(title),
     publishedAt: pickDate(item, now),
+    needsAi: false,
+    categoryMethod: null,
   };
 }

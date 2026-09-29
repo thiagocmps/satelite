@@ -28,6 +28,8 @@ export type SummaryView = {
   tokensOut: number | null;
 };
 
+export type CategoryMethod = 'keyword' | 'ai';
+
 export type Article = {
   id: string;
   title: string;
@@ -40,6 +42,10 @@ export type Article = {
   ingestedAt: string;
   source: SourceRef;
   category: CategoryRef | null;
+  /** Origem da categoria: keyword (regra), IA (OpenRouter) ou null (padrao da fonte/ausente). */
+  categoryMethod: CategoryMethod | null;
+  /** Confianca da IA entre 0 e 1 (null quando nao foi a IA). */
+  categoryConfidence: number | null;
   summary: SummaryView | null;
 };
 
@@ -56,6 +62,10 @@ export type NormalizedArticle = {
   urlHash: string;
   fingerprint: string;
   publishedAt: Date;
+  /** Entra na fila da IA quando a keyword nao decide e ha texto suficiente. */
+  needsAi: boolean;
+  /** 'keyword' quando uma regra decidiu; null quando ficou com o padrao da fonte. */
+  categoryMethod: 'keyword' | null;
 };
 
 export type NewsListQuery = {

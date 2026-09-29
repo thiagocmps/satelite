@@ -2,6 +2,8 @@ import type { Logger } from './config/logger.js';
 import { createAiProvider } from './integrations/ai/ai.registry.js';
 import { createFeedLoader } from './integrations/rss/rss.adapter.js';
 import { PgCategoriesRepository } from './modules/categories/categories.repository.js';
+import { ClassificationService } from './modules/classification/classification.service.js';
+import { PgClassificationRepository } from './modules/classification/classification.repository.js';
 import { IngestionService } from './modules/ingestion/ingestion.service.js';
 import { PgIngestionRunsRepository } from './modules/ingestion/ingestion.repository.js';
 import { PgNewsRepository } from './modules/news/news.repository.js';
@@ -33,6 +35,23 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     listRules: () => categoriesRepository.listRules(),
     logger,
     concurrency: env.INGEST_CONCURRENCY,
+    aiClassifyEnabled: env.AI_CLASSIFY_ENABLED,
+    minClassifyTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
+  });
+
+  const classification = new ClassificationService({
+    repository: new PgClassificationRepository(pool),
+    categories: categoriesRepository,
+    listRules: () => categoriesRepository.listRules(),
+    provider: aiProvider,
+    enabled: env.AI_CLASSIFY_ENABLED,
+    language: env.AI_LANGUAGE,
+    maxContentChars: env.AI_MAX_CONTENT_CHARS,
+    minTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
+    minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
+    batchSize: env.AI_CLASSIFY_BATCH,
+    concurrency: env.AI_CLASSIFY_CONCURRENCY,
+    logger,
   });
 
   return {
@@ -54,6 +73,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
       logger,
     }),
     ingestion,
+    classification,
   };
 }
 

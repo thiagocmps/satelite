@@ -42,6 +42,10 @@ export type Article = {
   ingestedAt: string;
   source: SourceRef;
   category: CategoryRef | null;
+  /** Origem da categoria: regra de keyword, IA (OpenRouter) ou null (padrao da fonte). */
+  categoryMethod: 'keyword' | 'ai' | null;
+  /** Confianca da IA entre 0 e 1 (null quando nao foi a IA). */
+  categoryConfidence: number | null;
   summary: SummaryView | null;
 };
 
@@ -132,6 +136,21 @@ export type IngestionReport = {
   duplicates: number;
   failed: number;
   results: SourceIngestionResult[];
+};
+
+/** Resumo de uma rodada de classificacao por IA (fila needs_ai). */
+export type ClassificationReport = {
+  processed: number;
+  resolvedKeyword: number;
+  resolvedShort: number;
+  aiCalls: number;
+  aiAssigned: number;
+  errors: number;
+  pending: number;
+};
+
+export type ClassificationStatus = {
+  pending: number;
 };
 
 /** Filtros da listagem de noticias (espelha a query da API). */

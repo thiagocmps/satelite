@@ -20,6 +20,10 @@ export function createAiProvider(env: Env): AiProvider {
         maxContentChars: env.AI_MAX_CONTENT_CHARS,
         appUrl: env.APP_URL,
         appName: env.APP_NAME,
+        classifyModel: env.AI_CLASSIFY_MODEL,
+        classifyFallbackModels: env.AI_CLASSIFY_FALLBACK_MODELS,
+        classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
+        classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
       }),
   };
 

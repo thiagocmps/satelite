@@ -21,6 +21,8 @@ const article: Article = {
   ingestedAt: '2026-09-28T10:05:00.000Z',
   source: { id: 's-1', slug: 'g1', name: 'G1', siteUrl: null },
   category: null,
+  categoryMethod: null,
+  categoryConfidence: null,
   summary: null,
 };
 
@@ -81,6 +83,10 @@ class FakeProvider implements AiProvider {
       completionTokens: result.completionTokens,
       latencyMs: 12,
     };
+  }
+
+  classify(): Promise<import('../../integrations/ai/ai.provider.js').AiSummaryResult> {
+    throw new Error('classify nao e usado nos testes de resumo');
   }
 }
 

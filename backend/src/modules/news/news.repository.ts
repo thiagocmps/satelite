@@ -13,6 +13,7 @@ export interface NewsRepository {
 
 const SELECT_ARTICLE = `
   select a.id, a.title, a.description, a.content, a.image_url, a.author, a.url, a.published_at, a.ingested_at,
+         a.category_method, a.category_confidence,
          s.id as source_id, s.slug as source_slug, s.name as source_name, s.site_url as source_site_url,
          c.id as category_id, c.slug as category_slug, c.name as category_name, c.color as category_color,
          sm.summary, sm.provider, sm.model, sm.prompt_version, sm.language as summary_language,
@@ -41,9 +42,11 @@ const INSERT_COLUMNS = [
   'url_hash',
   'fingerprint',
   'published_at',
+  'needs_ai',
+  'category_method',
 ] as const;
 
-const CHUNK_SIZE = 400; // 11 colunas x 400 = 4400 params, abaixo do limite de 65535 do Postgres
+const CHUNK_SIZE = 400; // 13 colunas x 400 = 5200 params, abaixo do limite de 65535 do Postgres
 
 /** Valores na mesma ordem de INSERT_COLUMNS. */
 const rowValues = (article: NormalizedArticle): unknown[] => [
@@ -58,6 +61,8 @@ const rowValues = (article: NormalizedArticle): unknown[] => [
   article.urlHash,
   article.fingerprint,
   article.publishedAt,
+  article.needsAi,
+  article.categoryMethod,
 ];
 
 type ArticleRow = Record<string, unknown>;
@@ -102,6 +107,12 @@ const toArticle = (row: ArticleRow): Article => ({
         color: (row.category_color as string | null) ?? null,
       }
     : null,
+  // pg devolve numeric como string; o contrato da API usa number
+  categoryMethod: (row.category_method as Article['categoryMethod'] | null) ?? null,
+  categoryConfidence:
+    row.category_confidence === null || row.category_confidence === undefined
+      ? null
+      : Number(row.category_confidence),
   summary: toSummary(row),
 });
 

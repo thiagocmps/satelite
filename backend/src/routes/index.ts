@@ -3,6 +3,8 @@ import type { Container } from '../container.js';
 import { generalRateLimit, summaryRateLimit } from '../middleware/rateLimit.middleware.js';
 import { createCategoriesController } from '../modules/categories/categories.controller.js';
 import { createCategoriesRoutes } from '../modules/categories/categories.routes.js';
+import { createClassificationController } from '../modules/classification/classification.controller.js';
+import { createClassificationRoutes } from '../modules/classification/classification.routes.js';
 import { createIngestionController } from '../modules/ingestion/ingestion.controller.js';
 import { createIngestionRoutes } from '../modules/ingestion/ingestion.routes.js';
 import { createNewsController } from '../modules/news/news.controller.js';
@@ -46,12 +48,14 @@ export function createApiRouter(container: Container): Router {
     container.categoriesRepository,
   );
   const ingestionController = createIngestionController(container.ingestion, container.runsRepository);
+  const classificationController = createClassificationController(container.classification);
 
   router.use(generalRateLimit(env.RATE_LIMIT_WINDOW_MS, env.RATE_LIMIT_MAX));
   router.use('/news', createNewsRoutes(newsController, summariesController, summaryRateLimit(env.SUMMARY_RATE_LIMIT_WINDOW_MS, env.SUMMARY_RATE_LIMIT_MAX)));
   router.use('/categories', createCategoriesRoutes(categoriesController));
   router.use('/sources', createSourcesRoutes(sourcesController));
   router.use('/ingest', createIngestionRoutes(ingestionController));
+  router.use('/ingest', createClassificationRoutes(classificationController));
 
   return router;
 }
