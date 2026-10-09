@@ -993,6 +993,75 @@ textarea {
   border-color: var(--success);
 }
 
+/* --------------------------------------------------- salvar em grupos */
+
+.save {
+  position: relative;
+  display: inline-flex;
+}
+
+/* dialogo centrado renderizado em portal: o card tem overflow:hidden e nao pode recortar */
+.save__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+}
+
+.save__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+}
+
+.save__pop {
+  position: relative;
+  width: min(320px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: var(--sp-4);
+}
+
+.save__title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: var(--sp-2);
+}
+
+.save__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.save__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.save__item:hover {
+  background: var(--surface-2);
+}
+
+.save__pop .input {
+  min-width: 0;
+}
+
 /* ------------------------------------------------------------ responsivo */
 
 /* telas medias: filtros em duas colunas, busca ocupando a linha inteira */

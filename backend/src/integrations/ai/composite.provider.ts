@@ -1,5 +1,5 @@
 import { ExternalServiceError, TimeoutError } from '../../core/errors.js';
-import type { AiProvider, AiSummaryResult, ClassifyInput, SummarizeInput } from './ai.provider.js';
+import type { AiProvider, AiSummaryResult, ClassifyInput, SuggestGroupInput, SummarizeInput } from './ai.provider.js';
 
 /**
  * Falhas que justificam tentar o PROXIMO provedor da cadeia. Erro de credencial
@@ -32,6 +32,10 @@ export class CompositeProvider implements AiProvider {
 
   async classify(input: ClassifyInput): Promise<AiSummaryResult> {
     return this.#run((provider) => provider.classify(input));
+  }
+
+  async suggestGroup(input: SuggestGroupInput): Promise<AiSummaryResult> {
+    return this.#run((provider) => provider.suggestGroup(input));
   }
 
   async #run(run: (provider: AiProvider) => Promise<AiSummaryResult>): Promise<AiSummaryResult> {

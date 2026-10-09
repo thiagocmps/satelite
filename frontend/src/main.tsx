@@ -8,6 +8,7 @@ import { ErrorBox } from './components/States';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { NewsDetailPage } from './pages/NewsDetailPage';
 import { NewsListPage } from './pages/NewsListPage';
+import { SavedPage } from './pages/SavedPage';
 import { SourcesPage } from './pages/SourcesPage';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <NewsListPage /> },
       { path: 'noticias/:id', element: <NewsDetailPage /> },
+      { path: 'salvos', element: <SavedPage /> },
       { path: 'categorias', element: <CategoriesPage /> },
       { path: 'fontes', element: <SourcesPage /> },
       { path: '*', element: <NotFound /> },

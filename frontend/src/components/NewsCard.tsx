@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Article } from '../api/types';
 import { formatRelative, hostFromUrl } from '../utils/format';
 import { SatelliteIcon } from './SatelliteIcon';
+import { SaveButton } from './SaveButton';
 
 type Props = { article: Article };
 
@@ -50,6 +51,7 @@ export function NewsCard({ article }: Props) {
           ) : null}
           <span className="spacer" />
           <span className="faint">{hostFromUrl(article.url)}</span>
+          <SaveButton articleId={article.id} />
         </div>
       </div>
     </article>

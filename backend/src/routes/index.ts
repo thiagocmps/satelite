@@ -9,6 +9,8 @@ import { createIngestionController } from '../modules/ingestion/ingestion.contro
 import { createIngestionRoutes } from '../modules/ingestion/ingestion.routes.js';
 import { createNewsController } from '../modules/news/news.controller.js';
 import { createNewsRoutes } from '../modules/news/news.routes.js';
+import { createSavedController } from '../modules/saved/saved.controller.js';
+import { createSavedRoutes } from '../modules/saved/saved.routes.js';
 import { createSourcesController } from '../modules/sources/sources.controller.js';
 import { createSourcesRoutes } from '../modules/sources/sources.routes.js';
 import { createSummariesController } from '../modules/summaries/summaries.controller.js';
@@ -49,6 +51,7 @@ export function createApiRouter(container: Container): Router {
   );
   const ingestionController = createIngestionController(container.ingestion, container.runsRepository);
   const classificationController = createClassificationController(container.classification);
+  const savedController = createSavedController(container.saved);
 
   router.use(generalRateLimit(env.RATE_LIMIT_WINDOW_MS, env.RATE_LIMIT_MAX));
   router.use('/news', createNewsRoutes(newsController, summariesController, summaryRateLimit(env.SUMMARY_RATE_LIMIT_WINDOW_MS, env.SUMMARY_RATE_LIMIT_MAX)));
@@ -56,6 +59,8 @@ export function createApiRouter(container: Container): Router {
   router.use('/sources', createSourcesRoutes(sourcesController));
   router.use('/ingest', createIngestionRoutes(ingestionController));
   router.use('/ingest', createClassificationRoutes(classificationController));
+  // Grupos e noticias salvas: o sugeridor de grupo e chamada de IA, entao usa o limite de resumo.
+  router.use(createSavedRoutes(savedController, summaryRateLimit(env.SUMMARY_RATE_LIMIT_WINDOW_MS, env.SUMMARY_RATE_LIMIT_MAX)));
 
   return router;
 }

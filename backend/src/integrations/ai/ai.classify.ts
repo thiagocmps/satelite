@@ -54,7 +54,7 @@ function systemClassifyPrompt(language: string): string {
 const JSON_FENCE = /```(?:json)?\s*([\s\S]*?)```/i;
 
 /** Extrai o primeiro bloco JSON valido (remove cercas e texto ao redor). */
-function extractJson(raw: string): string | null {
+export function extractJson(raw: string): string | null {
   const fenced = JSON_FENCE.exec(raw)?.[1];
   const candidate = fenced ?? raw;
   const start = candidate.indexOf('{');

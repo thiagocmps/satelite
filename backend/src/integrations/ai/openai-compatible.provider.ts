@@ -1,7 +1,15 @@
 import { ExternalServiceError, TimeoutError } from '../../core/errors.js';
 import { fetchWithTimeout } from '../../core/http.js';
 import { buildClassifyMessages } from './ai.classify.js';
-import type { AiProvider, AiSummaryResult, ChatMessage, ClassifyInput, SummarizeInput } from './ai.provider.js';
+import { buildSuggestGroupMessages } from './ai.group.js';
+import type {
+  AiProvider,
+  AiSummaryResult,
+  ChatMessage,
+  ClassifyInput,
+  SuggestGroupInput,
+  SummarizeInput,
+} from './ai.provider.js';
 import { buildMessages, sanitizeSummary } from './ai.prompts.js';
 
 /**
@@ -84,13 +92,25 @@ export class OpenAICompatibleProvider implements AiProvider {
   }
 
   async classify(input: ClassifyInput): Promise<AiSummaryResult> {
+    return this.#runJson((model) => this.#classifyBody(model, input));
+  }
+
+  async suggestGroup(input: SuggestGroupInput): Promise<AiSummaryResult> {
+    return this.#runJson((model) => this.#suggestGroupBody(model, input));
+  }
+
+  /**
+   * Chamadas JSON (classificacao/sugestao de grupo): mesmo modelo, timeout e
+   * retries; a unica diferenca e o corpo montado. Modelo proprio ou o padrao.
+   */
+  async #runJson(buildBody: (model: string) => ChatRequestBody): Promise<AiSummaryResult> {
     const primary = this.config.classifyModel || this.config.model;
     const extras = this.config.classifyFallbackModels.length
       ? this.config.classifyFallbackModels
       : this.config.fallbackModels;
     const candidates = [primary, ...extras.filter((model) => model !== primary)];
     return this.#runCandidates(candidates, (model) =>
-      this.#callWithRetry((m) => this.#classifyBody(m, input), this.config.classifyMaxRetries, this.config.classifyTimeoutMs, model),
+      this.#callWithRetry(buildBody, this.config.classifyMaxRetries, this.config.classifyTimeoutMs, model),
     );
   }
 
@@ -148,6 +168,15 @@ export class OpenAICompatibleProvider implements AiProvider {
       messages: buildClassifyMessages(input, { language: this.config.language, maxContentChars: this.config.maxContentChars }),
       temperature: 0,
       // JSON estrito: o modelo deve responder somente com o objeto de classificacao
+      response_format: { type: 'json_object' },
+    };
+  }
+
+  #suggestGroupBody(model: string, input: SuggestGroupInput): ChatRequestBody {
+    return {
+      model,
+      messages: buildSuggestGroupMessages(input, { language: this.config.language, maxContentChars: this.config.maxContentChars }),
+      temperature: 0,
       response_format: { type: 'json_object' },
     };
   }

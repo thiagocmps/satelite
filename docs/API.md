@@ -553,6 +553,62 @@ Quantos artigos aguardando a IA.
 
 ---
 
+## Grupos e notícias salvas
+
+Arquivo pessoal do leitor. Um **grupo** é uma coleção temática que atravessa
+categorias ("Eleições 2026 Brasil" junta política, economia e mundo), por isso
+vive em tabela própria (`news_groups`), não em `categories`. O vínculo é N:N
+(`saved_articles`): a mesma notícia pode estar em vários grupos.
+
+```ts
+type NewsGroup = { id: string; name: string; color: string | null; savedCount: number; createdAt: string };
+```
+
+### `GET /groups` → `200`
+
+Lista os grupos com a contagem de notícias salvas.
+
+### `POST /groups` → `201`
+
+```json
+{ "name": "Eleicoes 2026 Brasil", "color": "#1e4fd8" }
+```
+
+`name` (2–80) é único; `color` é opcional (`#rrggbb`). `409 CONFLICT` se o nome existe.
+
+### `PATCH /groups/:id` → `200` · `DELETE /groups/:id` → `204`
+
+Renomear/recor e remover. Remover o grupo apaga só os vínculos (as notícias ficam).
+
+### `PUT /groups/:id/articles/:articleId` → `204` · `DELETE ...` → `204`
+
+Salva/remove a notícia do grupo. Salvar é **idempotente**. `404` se o grupo ou a
+notícia não existirem.
+
+### `GET /groups/:id/articles` · `GET /saved` → `200`
+
+Notícias de um grupo (ordem de salvamento) e todas as salvas (ordem de
+publicação). Mesma paginação de `/news` (`Paginated<Article>`).
+
+### `GET /saved/ids` → `200`
+
+Mapa `articleId -> [groupId]` para a UI marcar os cards sem uma requisição por
+notícia.
+
+### `POST /groups/suggest` → `200`
+
+Sugestão por IA (mesmo provedor da classificação): um grupo existente ou um
+nome novo para o leitor confirmar. Sujeita ao limite de `summaryRateLimit`.
+
+```json
+{ "data": { "groupId": "…", "newGroupName": null, "confidence": 0.9 } }
+```
+
+Ambos os campos podem vir `null` (a IA preferiu não sugerir). `502 AI_BAD_RESPONSE`
+se a resposta do modelo for ilegível.
+
+---
+
 ## Autenticação
 
 Não existe. A API é anônima e o projeto não tem usuário. Isso é uma escolha consciente, com uma

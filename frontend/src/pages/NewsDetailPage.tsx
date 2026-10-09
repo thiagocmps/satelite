@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
+import { SaveButton } from '../components/SaveButton';
 import { SummaryPanel } from '../components/SummaryPanel';
 import { ErrorBox } from '../components/States';
 import { useArticle } from '../hooks/useSatelite';
@@ -84,10 +85,11 @@ export function NewsDetailPage() {
             <p className="muted small">A fonte nao disponibilizou o texto completo; resuma pelo link original.</p>
           )}
 
-          <p style={{ marginTop: 'var(--sp-5)' }}>
+          <p className="row" style={{ marginTop: 'var(--sp-5)' }}>
             <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">
               Ler a noticia original em {hostFromUrl(data.url)} ↗
             </a>
+            <SaveButton articleId={data.id} />
           </p>
         </article>
 

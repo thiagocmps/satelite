@@ -8,6 +8,8 @@ import { IngestionService } from './modules/ingestion/ingestion.service.js';
 import { PgIngestionRunsRepository } from './modules/ingestion/ingestion.repository.js';
 import { PgNewsRepository } from './modules/news/news.repository.js';
 import { NewsService } from './modules/news/news.service.js';
+import { PgSavedRepository } from './modules/saved/saved.repository.js';
+import { SavedService } from './modules/saved/saved.service.js';
 import { PgSourcesRepository } from './modules/sources/sources.repository.js';
 import { PgSummariesRepository } from './modules/summaries/summaries.repository.js';
 import { SummariesService } from './modules/summaries/summaries.service.js';
@@ -25,6 +27,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
   const sourcesRepository = new PgSourcesRepository(pool);
   const summariesRepository = new PgSummariesRepository(pool);
   const runsRepository = new PgIngestionRunsRepository(pool);
+  const savedRepository = new PgSavedRepository(pool);
   const aiProvider = createAiProvider(env);
 
   /** Id da categoria 'politica' (resolvido uma vez; protege politica que cita esporte). */
@@ -72,6 +75,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     sourcesRepository,
     summariesRepository,
     runsRepository,
+    savedRepository,
     aiProvider,
     news: new NewsService(newsRepository),
     summaries: new SummariesService({
@@ -80,6 +84,15 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
       provider: aiProvider,
       promptVersion: env.AI_PROMPT_VERSION,
       language: env.AI_LANGUAGE,
+      logger,
+    }),
+    saved: new SavedService({
+      repository: savedRepository,
+      news: newsRepository,
+      provider: aiProvider,
+      language: env.AI_LANGUAGE,
+      maxContentChars: env.AI_MAX_CONTENT_CHARS,
+      minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
       logger,
     }),
     ingestion,

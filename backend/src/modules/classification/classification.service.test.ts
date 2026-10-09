@@ -63,6 +63,10 @@ class FakeProvider implements AiProvider {
       latencyMs: 5,
     };
   }
+
+  async suggestGroup(): Promise<AiSummaryResult> {
+    throw new Error('suggestGroup nao e usado aqui');
+  }
 }
 
 function setup(

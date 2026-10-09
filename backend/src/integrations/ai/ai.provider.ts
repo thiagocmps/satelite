@@ -27,6 +27,16 @@ export type ClassifyInput = {
   categories: ClassifyCategory[];
 };
 
+/** Grupos existentes oferecidos ao modelo como destino possivel. */
+export type SuggestGroupGroup = { id: string; name: string };
+
+export type SuggestGroupInput = {
+  title: string;
+  description: string | null;
+  content: string | null;
+  groups: SuggestGroupGroup[];
+};
+
 export interface AiProvider {
   /** Identificador estavel gravado no banco junto do resumo. */
   readonly name: string;
@@ -40,6 +50,12 @@ export interface AiProvider {
    * em falha — a classificacao em duvida permanece pendente e tenta de novo.
    */
   classify(input: ClassifyInput): Promise<AiSummaryResult>;
+  /**
+   * Sugere em qual grupo salvo a noticia se encaixa — ou um nome para um grupo
+   * novo. Responde o mesmo JSON cru das outras chamadas; o parsing fica no
+   * service. Deve lancar AppError em falha.
+   */
+  suggestGroup(input: SuggestGroupInput): Promise<AiSummaryResult>;
 }
 
 export type ChatMessage = { role: 'system' | 'user'; content: string };

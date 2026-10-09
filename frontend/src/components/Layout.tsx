@@ -3,6 +3,7 @@ import { SatelliteIcon } from './SatelliteIcon';
 
 const links = [
   { to: '/', label: 'Noticias', end: true },
+  { to: '/salvos', label: 'Salvos', end: false },
   { to: '/categorias', label: 'Categorias', end: false },
   { to: '/fontes', label: 'Fontes', end: false },
 ];

@@ -88,6 +88,10 @@ class FakeProvider implements AiProvider {
   classify(): Promise<import('../../integrations/ai/ai.provider.js').AiSummaryResult> {
     throw new Error('classify nao e usado nos testes de resumo');
   }
+
+  suggestGroup(): Promise<import('../../integrations/ai/ai.provider.js').AiSummaryResult> {
+    throw new Error('suggestGroup nao e usado nos testes de resumo');
+  }
 }
 
 const inputHashOf = (item: Article, model: string, promptVersion: string) =>

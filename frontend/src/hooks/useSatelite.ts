@@ -180,3 +180,66 @@ export function useRunClassification(onSuccess?: (report: ClassificationReport) 
     },
   });
 }
+
+export const savedKeys = {
+  groups: ['saved', 'groups'] as const,
+  ids: ['saved', 'ids'] as const,
+  list: (groupId: string | null, page: number) => ['saved', 'list', groupId ?? 'all', page] as const,
+};
+
+export function useGroups() {
+  return useQuery({ queryKey: savedKeys.groups, queryFn: api.fetchGroups });
+}
+
+/** Mapa artigo -> grupos, para marcar os cards sem uma requisicao por noticia. */
+export function useSavedIds() {
+  return useQuery({ queryKey: savedKeys.ids, queryFn: api.fetchSavedIds });
+}
+
+/** Noticias salvas: de um grupo especifico ou de todos (groupId null). */
+export function useSavedArticles(groupId: string | null, page: number) {
+  return useQuery({
+    queryKey: savedKeys.list(groupId, page),
+    queryFn: () => (groupId ? api.fetchGroupArticles(groupId, page) : api.fetchSaved(page)),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useCreateGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.createGroup,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+export function useDeleteGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteGroup,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+export function useSaveArticle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, articleId }: { groupId: string; articleId: string }) =>
+      api.saveArticleToGroup(groupId, articleId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+export function useUnsaveArticle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, articleId }: { groupId: string; articleId: string }) =>
+      api.removeArticleFromGroup(groupId, articleId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+/** Pede a IA um grupo (existente ou novo) para a noticia. */
+export function useSuggestGroup() {
+  return useMutation({ mutationFn: (articleId: string) => api.suggestGroup(articleId) });
+}

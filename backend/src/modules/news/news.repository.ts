@@ -11,7 +11,8 @@ export interface NewsRepository {
   insertMany(articles: NormalizedArticle[]): Promise<{ inserted: number; duplicates: number }>;
 }
 
-const SELECT_ARTICLE = `
+/** Projecao completa de artigo (com fonte, categoria e ultimo resumo). Reusada por outros repositorios. */
+export const SELECT_ARTICLE = `
   select a.id, a.title, a.description, a.content, a.image_url, a.author, a.url, a.published_at, a.ingested_at,
          a.category_method, a.category_confidence,
          s.id as source_id, s.slug as source_slug, s.name as source_name, s.site_url as source_site_url,
@@ -83,7 +84,7 @@ const toSummary = (row: ArticleRow): SummaryView | null => {
   };
 };
 
-const toArticle = (row: ArticleRow): Article => ({
+export const toArticle = (row: ArticleRow): Article => ({
   id: row.id as string,
   title: row.title as string,
   description: (row.description as string | null) ?? null,

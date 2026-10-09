@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ExternalServiceError, TimeoutError } from '../../core/errors.js';
-import type { AiProvider, AiSummaryResult, ClassifyInput, SummarizeInput } from './ai.provider.js';
+import type { AiProvider, AiSummaryResult, ClassifyInput, SuggestGroupInput, SummarizeInput } from './ai.provider.js';
 import { CompositeProvider } from './composite.provider.js';
 
 const result = (provider: string, model = 'm'): AiSummaryResult => ({
@@ -19,11 +19,18 @@ const classifyInput: ClassifyInput = {
   content: null,
   categories: [{ slug: 'mundo', name: 'Mundo' }],
 };
+const suggestInput: SuggestGroupInput = {
+  title: 'T',
+  description: null,
+  content: null,
+  groups: [{ id: 'g-1', name: 'Eleicoes 2026' }],
+};
 
-/** Provedor fake: `summarize`/`classify` gravam as chamadas e respondem o que for configurado. */
+/** Provedor fake: `summarize`/`classify`/`suggestGroup` gravam as chamadas e respondem o que for configurado. */
 class SpyProvider implements AiProvider {
   readonly summarize = vi.fn<(_: SummarizeInput) => Promise<AiSummaryResult>>();
   readonly classify = vi.fn<(_: ClassifyInput) => Promise<AiSummaryResult>>();
+  readonly suggestGroup = vi.fn<(_: SuggestGroupInput) => Promise<AiSummaryResult>>();
 
   constructor(
     readonly name: string,
@@ -31,11 +38,13 @@ class SpyProvider implements AiProvider {
   ) {
     this.summarize.mockImplementation(async () => result(name, model));
     this.classify.mockImplementation(async () => result(name, model));
+    this.suggestGroup.mockImplementation(async () => result(name, model));
   }
 
   failWith(error: Error): void {
     this.summarize.mockRejectedValue(error);
     this.classify.mockRejectedValue(error);
+    this.suggestGroup.mockRejectedValue(error);
   }
 }
 
@@ -59,11 +68,14 @@ describe('CompositeProvider', () => {
 
     const summary = await composite.summarize(input);
     const classify = await composite.classify(classifyInput);
+    const suggest = await composite.suggestGroup(suggestInput);
 
     expect(summary.provider).toBe('openrouter');
     expect(classify.provider).toBe('openrouter');
+    expect(suggest.provider).toBe('openrouter');
     expect(secondary.summarize).not.toHaveBeenCalled();
     expect(secondary.classify).not.toHaveBeenCalled();
+    expect(secondary.suggestGroup).not.toHaveBeenCalled();
   });
 
   it('cai para o secundario quando o principal estoura a cota do plano gratuito (429)', async () => {
@@ -77,8 +89,10 @@ describe('CompositeProvider', () => {
 
     expect(summary).toMatchObject({ text: 'ok', provider: 'opencode', model: 'm2' });
     expect(classify).toMatchObject({ provider: 'opencode' });
+    expect((await composite.suggestGroup(suggestInput)).provider).toBe('opencode');
     expect(secondary.summarize).toHaveBeenCalledTimes(1);
     expect(secondary.classify).toHaveBeenCalledTimes(1);
+    expect(secondary.suggestGroup).toHaveBeenCalledTimes(1);
   });
 
   it('cai para o secundario quando o principal esta sem creditos (402)', async () => {

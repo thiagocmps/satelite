@@ -153,6 +153,25 @@ export type ClassificationStatus = {
   pending: number;
 };
 
+/** Grupo tematico pessoal de noticias salvas (atravessa categorias). */
+export type NewsGroup = {
+  id: string;
+  name: string;
+  color: string | null;
+  savedCount: number;
+  createdAt: string;
+};
+
+/** { articleId: [groupId] } — em quais grupos cada noticia ja esta salva. */
+export type SavedIds = Record<string, string[]>;
+
+/** Sugestao da IA: um grupo existente ou um nome novo. Ambos null = sem sugestao. */
+export type GroupSuggestion = {
+  groupId: string | null;
+  newGroupName: string | null;
+  confidence: number;
+};
+
 /** Filtros da listagem de noticias (espelha a query da API). */
 export type NewsFilters = {
   q?: string;

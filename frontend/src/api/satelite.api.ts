@@ -6,10 +6,13 @@ import type {
   CategoryRule,
   ClassificationReport,
   ClassificationStatus,
+  GroupSuggestion,
   IngestionReport,
   IngestionRun,
   NewsFilters,
+  NewsGroup,
   Paginated,
+  SavedIds,
   Source,
   SourcesImportReport,
 } from './types';
@@ -104,4 +107,42 @@ export function runClassification(): Promise<{ data: ClassificationReport }> {
 
 export function fetchClassificationStatus(): Promise<{ data: ClassificationStatus }> {
   return api.get<{ data: ClassificationStatus }>('/ingest/classify/status');
+}
+
+/* -------------------------------------------------------- grupos e salvos */
+
+export function fetchGroups(): Promise<{ data: NewsGroup[] }> {
+  return api.get<{ data: NewsGroup[] }>('/groups');
+}
+
+export function createGroup(input: { name: string; color?: string | null }): Promise<{ data: NewsGroup }> {
+  return api.post<{ data: NewsGroup }>('/groups', input);
+}
+
+export function deleteGroup(id: string): Promise<void> {
+  return api.delete<void>(`/groups/${id}`);
+}
+
+export function saveArticleToGroup(groupId: string, articleId: string): Promise<void> {
+  return api.put<void>(`/groups/${groupId}/articles/${articleId}`);
+}
+
+export function removeArticleFromGroup(groupId: string, articleId: string): Promise<void> {
+  return api.delete<void>(`/groups/${groupId}/articles/${articleId}`);
+}
+
+export function fetchGroupArticles(groupId: string, page = 1, limit = 12): Promise<Paginated<Article>> {
+  return api.get<Paginated<Article>>(`/groups/${groupId}/articles${buildQuery({ page, limit })}`);
+}
+
+export function fetchSaved(page = 1, limit = 12): Promise<Paginated<Article>> {
+  return api.get<Paginated<Article>>(`/saved${buildQuery({ page, limit })}`);
+}
+
+export function fetchSavedIds(): Promise<{ data: SavedIds }> {
+  return api.get<{ data: SavedIds }>('/saved/ids');
+}
+
+export function suggestGroup(articleId: string): Promise<{ data: GroupSuggestion }> {
+  return api.post<{ data: GroupSuggestion }>('/groups/suggest', { articleId });
 }
