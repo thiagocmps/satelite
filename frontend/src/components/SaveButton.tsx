@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FormEvent } from 'react';
 import { useCreateGroup, useGroups, useSaveArticle, useSavedIds, useSuggestGroup, useUnsaveArticle } from '../hooks/useSatelite';
 
 /**
- * Botao "salvar" com popover de grupos. O estado de cada noticia vem de
+ * Botao "salvar" com dialogo de colecoes. O estado de cada noticia vem de
  * useSavedIds (uma requisicao cacheada para todos os cards). A sugestao por IA
  * reusa o mesmo provider da classificacao e apenas pre-marca/propoe.
  */
 export function SaveButton({ articleId }: { articleId: string }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const groups = useGroups();
   const savedIds = useSavedIds();
@@ -34,9 +36,13 @@ export function SaveButton({ articleId }: { articleId: string }) {
     if (value.length < 2) return;
     createGroup.mutate(
       { name: value },
-      { onSuccess: (response) => save.mutate({ groupId: response.data.id, articleId }) },
+      {
+        onSuccess: (response) => {
+          save.mutate({ groupId: response.data.id, articleId });
+          setName('');
+        },
+      },
     );
-    setName('');
   }
 
   function runSuggest() {
@@ -49,9 +55,28 @@ export function SaveButton({ articleId }: { articleId: string }) {
     });
   }
 
+  useEffect(() => {
+    if (open) {
+      const dialog = dialogRef.current;
+      if (dialog) dialog.focus();
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    } else {
+      buttonRef.current?.focus();
+      return undefined;
+    }
+  }, [open]);
+
   return (
     <span className="save">
       <button
+        ref={buttonRef}
         type="button"
         className={`button button--sm${isSaved ? ' button--primary' : ''}`}
         aria-expanded={open}
@@ -65,13 +90,13 @@ export function SaveButton({ articleId }: { articleId: string }) {
         ? createPortal(
             <div className="save__overlay">
               <div className="save__backdrop" onClick={() => setOpen(false)} role="presentation" />
-              <div className="save__pop" role="dialog" aria-label="Salvar em grupos">
-                <p className="save__title">Salvar em grupos</p>
+              <div className="save__pop" role="dialog" aria-modal="true" aria-label="Salvar em coleções" tabIndex={-1} ref={dialogRef}>
+                <p className="save__title">Salvar em coleções</p>
 
                 {groups.isPending ? (
                   <p className="faint small">Carregando…</p>
                 ) : list.length === 0 ? (
-                  <p className="faint small">Nenhum grupo ainda. Crie o primeiro abaixo.</p>
+                  <p className="faint small">Nenhuma coleção ainda. Crie a primeira abaixo.</p>
                 ) : (
                   <div className="save__list">
                     {list.map((group) => (
@@ -87,16 +112,21 @@ export function SaveButton({ articleId }: { articleId: string }) {
                   </div>
                 )}
 
+                <div className="save__divider" aria-hidden="true" />
+
                 <button
                   type="button"
                   className="button button--sm"
-                  style={{ marginTop: 'var(--sp-2)' }}
                   onClick={runSuggest}
                   disabled={suggest.isPending}
                 >
-                  {suggest.isPending ? '✦ Sugerindo…' : '✦ Sugerir grupo'}
+                  {suggest.isPending ? '✦ Sugerindo…' : '✦ Sugerir coleção'}
                 </button>
-                {suggest.error ? <p className="small" style={{ color: 'var(--danger)' }}>{suggest.error.message}</p> : null}
+                {suggest.error ? (
+                  <p className="small" style={{ color: 'var(--danger)', marginTop: 'var(--sp-2)' }}>
+                    {suggest.error.message}
+                  </p>
+                ) : null}
 
                 <form className="row" style={{ marginTop: 'var(--sp-3)' }} onSubmit={submitNew}>
                   <input
@@ -106,8 +136,8 @@ export function SaveButton({ articleId }: { articleId: string }) {
                     maxLength={80}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Novo grupo (ex.: Eleicoes 2026)"
-                    aria-label="Nome do novo grupo"
+                    placeholder="Nova coleção (ex.: Eleições 2026)"
+                    aria-label="Nome da nova coleção"
                   />
                   <button type="submit" className="button button--sm" disabled={createGroup.isPending || name.trim().length < 2}>
                     Criar
@@ -117,7 +147,7 @@ export function SaveButton({ articleId }: { articleId: string }) {
                 <button
                   type="button"
                   className="button button--sm button--ghost"
-                  style={{ marginTop: 'var(--sp-2)' }}
+                  style={{ marginTop: 'var(--sp-3)', width: '100%' }}
                   onClick={() => setOpen(false)}
                 >
                   Fechar

@@ -69,6 +69,27 @@ class FakeProvider implements AiProvider {
   }
 }
 
+/** Provedor com lote: uma requisicao cobre todos os artigos do pedido. */
+class FakeBatchProvider extends FakeProvider {
+  batchCalls = 0;
+  readonly batchSizes: number[] = [];
+
+  async classifyBatch(inputs: ClassifyInput[]): Promise<AiSummaryResult> {
+    this.batchCalls += 1;
+    this.batchSizes.push(inputs.length);
+    // cada artigo vira um item do lote, com o slug da primeira categoria
+    const results = inputs.map((_, index) => ({ id: index, categorySlug: 'tecnologia', confidence: 0.9 }));
+    return {
+      text: JSON.stringify({ results }),
+      provider: this.name,
+      model: this.model,
+      promptTokens: 0,
+      completionTokens: 0,
+      latencyMs: 5,
+    };
+  }
+}
+
 function setup(
   pending: PendingArticle[],
   providerBehavior?: (input: ClassifyInput) => Promise<string>,
@@ -89,6 +110,9 @@ function setup(
     minTextChars: 40,
     minConfidence: 0.5,
     batchSize: 100,
+    // 1 = uma chamada por artigo (o FakeProvider nao implementa lote); os
+    // testes de lote sobrescrevem com um provider que sim.
+    aiBatchSize: 1,
     concurrency: 2,
     blockSports: false,
     logger,
@@ -151,6 +175,42 @@ describe('ClassificationService', () => {
       confidence: 0.9,
       aiClassified: true,
     });
+  });
+
+  it('classifica varios artigos em UMA requisicao quando o provedor aceita lote', async () => {
+    const repository = new FakeRepository([
+      ambiguousArticle,
+      { ...ambiguousArticle, id: 'a-2' },
+      { ...ambiguousArticle, id: 'a-3' },
+    ]);
+    const provider = new FakeBatchProvider(() => Promise.resolve('nao deveria ser usado'));
+    const service = new ClassificationService({
+      repository,
+      categories: categoriesFake,
+      listRules: async () => rules,
+      provider,
+      enabled: true,
+      language: 'pt-BR',
+      maxContentChars: 500,
+      minTextChars: 40,
+      minConfidence: 0.5,
+      batchSize: 100,
+      // 3 artigos cabem numa unica requisicao
+      aiBatchSize: 3,
+      concurrency: 1,
+      blockSports: false,
+      logger,
+    });
+
+    const report = await service.runOnce();
+
+    // o custo e por requisicao: 1 chamada no lugar de 3
+    expect(provider.batchCalls).toBe(1);
+    expect(provider.calls).toBe(0);
+    expect(provider.batchSizes).toEqual([3]);
+    expect(report).toMatchObject({ processed: 3, aiCalls: 1, aiAssigned: 3, errors: 0, pending: 0 });
+    expect(repository.resolutions).toHaveLength(3);
+    expect(repository.resolutions.every((entry) => entry.verdict.categoryId === 'cat-tech')).toBe(true);
   });
 
   it('mantem a categoria atual quando a IA nao sabe', async () => {
@@ -249,10 +309,11 @@ describe('ClassificationService', () => {
 
     const report = await service.runOnce();
 
-    // so o primeiro artigo tentou falar com o provedor; o resto nao foi puxado
+    // a triagem (sem IA) varre os 3; o aborto vale para as CHAMADAS de modelo:
+    // so o primeiro artigo chega ao provedor, o resto fica pendente
     expect(provider.calls).toBe(1);
     expect(repository.resolutions).toHaveLength(0);
-    expect(report).toMatchObject({ processed: 1, aiCalls: 1, errors: 1, pending: 3 });
+    expect(report).toMatchObject({ processed: 3, aiCalls: 1, errors: 1, pending: 3 });
   });
 
   it('resposta ilegivel mantem o artigo pendente', async () => {
@@ -315,6 +376,7 @@ describe('ClassificationService', () => {
       minTextChars: 40,
       minConfidence: 0.5,
       batchSize: 100,
+      aiBatchSize: 1,
       concurrency: 2,
       blockSports: true,
       logger,

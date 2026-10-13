@@ -62,6 +62,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     minTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
     minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
     batchSize: env.AI_CLASSIFY_BATCH,
+    aiBatchSize: env.AI_CLASSIFY_BATCH_SIZE,
     concurrency: env.AI_CLASSIFY_CONCURRENCY,
     blockSports: env.CONTENT_FILTER_SPORTS,
     logger,

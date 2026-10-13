@@ -35,7 +35,7 @@ export function NewsDetailPage() {
   return (
     <>
       <Link className="detail__back" to="/">
-        ← Voltar para as noticias
+        ← Voltar para as notícias
       </Link>
 
       <div className="detail">
@@ -47,9 +47,9 @@ export function NewsDetailPage() {
                 <strong>{data.source.name}</strong>
                 {data.category ? <span className="badge badge--category">{data.category.name}</span> : null}
                 {data.categoryMethod === 'ai' ? (
-                  <span className="faint small" title="Categoria atribuida por IA (OpenRouter)">
+                  <span className="faint small" title="Categoria atribuída por IA (OpenRouter)">
                     por IA{' '}
-                    {data.categoryConfidence != null ? `${Math.round(data.categoryConfidence * 100)}% de confianca` : ''}
+                    {data.categoryConfidence != null ? `${Math.round(data.categoryConfidence * 100)}% de confiança` : ''}
                   </span>
                 ) : null}
                 {data.categoryMethod === 'keyword' ? (
@@ -82,12 +82,12 @@ export function NewsDetailPage() {
               ) : null}
             </>
           ) : (
-            <p className="muted small">A fonte nao disponibilizou o texto completo; resuma pelo link original.</p>
+            <p className="muted small">A fonte não disponibilizou o texto completo; resuma pelo link original.</p>
           )}
 
           <p className="row" style={{ marginTop: 'var(--sp-5)' }}>
             <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">
-              Ler a noticia original em {hostFromUrl(data.url)} ↗
+              Ler a notícia original em {hostFromUrl(data.url)} ↗
             </a>
             <SaveButton articleId={data.id} />
           </p>

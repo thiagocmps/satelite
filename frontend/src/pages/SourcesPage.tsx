@@ -20,7 +20,7 @@ import { formatDateTime, slugify } from '../utils/format';
 
 function statusBadge(status: string | null, error: string | null) {
   if (status === 'ok') return <span className="badge badge--ok">ok</span>;
-  if (status === 'not_modified') return <span className="badge">304 sem mudancas</span>;
+  if (status === 'not_modified') return <span className="badge">304 sem mudanças</span>;
   if (status === 'error') return <span className="badge badge--error" title={error ?? undefined}>erro</span>;
   return <span className="badge">nunca executada</span>;
 }
@@ -90,7 +90,7 @@ export function SourcesPage() {
       <PageHeader
         title="Fontes"
         eyebrow="MISSÃO · ANTENAS"
-        description="Feeds RSS/Atom monitorados. A ingestao roda por agendamento e tambem pode ser disparada aqui."
+        description="Feeds RSS/Atom monitorados. A ingestão roda por agendamento e também pode ser disparada aqui."
         action={
           <>
             <input
@@ -114,7 +114,7 @@ export function SourcesPage() {
                 '⇧ Importar'
               )}
             </button>
-            <a className="button" href="/api/v1/sources/export?format=opml" title="Baixar lista de feeds (OPML - importavel em leitores de RSS)">
+            <a className="button" href="/api/v1/sources/export?format=opml" title="Baixar lista de feeds (OPML - importável em leitores de RSS)">
               ⇩ OPML
             </a>
             <a className="button" href="/api/v1/sources/export?format=json" title="Baixar backup em JSON">
@@ -137,7 +137,7 @@ export function SourcesPage() {
               title={
                 pendingClassification > 0
                   ? `${pendingClassification} artigo${pendingClassification > 1 ? 's' : ''} esperando a IA`
-                  : 'Nenhum artigo na fila de classificacao'
+                  : 'Nenhum artigo na fila de classificação'
               }
             >
               {classify.isPending ? (
@@ -155,12 +155,12 @@ export function SourcesPage() {
       {error ? <ErrorBox message={error.message} /> : null}
       {ingest.isSuccess ? (
         <p className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }}>
-          Ingestao concluida. Va em Noticias para ver os resultados.
+          Ingestão concluída. Vá em Notícias para ver os resultados.
         </p>
       ) : null}
       {classifyResult ? (
         <p className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }} role="status">
-          Classificacao concluida:{' '}
+          Classificação concluída:{' '}
           <strong>
             {classifyResult.processed} artigo{classifyResult.processed === 1 ? '' : 's'} processado
             {classifyResult.processed === 1 ? '' : 's'}
@@ -190,7 +190,7 @@ export function SourcesPage() {
           ) : null}
           {importResult.imported > 0 ? (
             <p className="small" style={{ marginTop: 'var(--sp-2)' }}>
-              As novas fontes ainda nao coletaram noticias: use "Ingerir tudo" para buscar agora.
+              As novas fontes ainda não coletaram notícias: use "Ingerir tudo" para buscar agora.
             </p>
           ) : null}
         </div>
@@ -199,7 +199,7 @@ export function SourcesPage() {
       <div className="stack">
         <section className="panel">
           <h2 className="panel__title">Nova fonte</h2>
-          <p className="panel__hint">Qualquer feed publico RSS ou Atom. O slug e derivado do nome se voce deixar vazio.</p>
+          <p className="panel__hint">Qualquer feed público RSS ou Atom. O slug é derivado do nome se você deixar vazio.</p>
 
           <form className="form-grid" onSubmit={submit}>
             <div className="field">
@@ -262,7 +262,7 @@ export function SourcesPage() {
 
             <div className="field">
               <label className="field__label" htmlFor="fonte-categoria">
-                Categoria padrao
+                Categoria padrão
               </label>
               <select
                 id="fonte-categoria"
@@ -270,7 +270,7 @@ export function SourcesPage() {
                 value={form.categoryId}
                 onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
               >
-                <option value="">Sem padrao</option>
+                <option value="">Sem padrão</option>
                 {(categories.data?.data ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -292,7 +292,7 @@ export function SourcesPage() {
 
         <section className="panel">
           <h2 className="panel__title">Fontes ativas</h2>
-          <p className="panel__hint">Desativar uma fonte interrompe a coleta; as noticias ja ingeridas permanecem.</p>
+          <p className="panel__hint">Desativar uma fonte interrompe a coleta; as notícias já ingeridas permanecem.</p>
 
           {sources.isPending ? (
             <div className="skeleton" style={{ height: 160 }} />
@@ -305,8 +305,8 @@ export function SourcesPage() {
                   <tr>
                     <th>Fonte</th>
                     <th>Status</th>
-                    <th>Ultima execucao</th>
-                    <th aria-label="Acoes" />
+                    <th>Última execução</th>
+                    <th aria-label="Ações" />
                   </tr>
                 </thead>
                 <tbody>
@@ -326,10 +326,10 @@ export function SourcesPage() {
                         ) : null}
                       </td>
                       <td data-label="Status">{statusBadge(source.lastStatus, source.lastError)}</td>
-                      <td data-label="Ultima execucao" className="muted small">
+                      <td data-label="Última execução" className="muted small">
                         {formatDateTime(source.lastFetchedAt)}
                       </td>
-                      <td data-label="Acoes">
+                      <td data-label="Ações">
                         <div className="row-actions">
                           <button
                             type="button"
@@ -366,19 +366,19 @@ export function SourcesPage() {
         </section>
 
         <section className="panel">
-          <h2 className="panel__title">Historico de ingestao</h2>
-          <p className="panel__hint">Ultimas execucoes: quantos itens vieram do feed, quantos entraram e quantos eram duplicados.</p>
+          <h2 className="panel__title">Histórico de ingestão</h2>
+          <p className="panel__hint">Últimas execuções: quantos itens vieram do feed, quantos entraram e quantos eram duplicados.</p>
 
           {runs.isPending ? (
             <div className="skeleton" style={{ height: 120 }} />
           ) : recentRuns.length === 0 ? (
-            <EmptyState title="Nenhuma execucao registrada" />
+            <EmptyState title="Nenhuma execução registrada" />
           ) : (
             <div className="table__scroll">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Inicio</th>
+                    <th>Início</th>
                     <th>Fonte</th>
                     <th>Status</th>
                     <th>Itens</th>
@@ -389,7 +389,7 @@ export function SourcesPage() {
                 <tbody>
                   {recentRuns.map((run) => (
                     <tr key={run.id}>
-                      <td data-label="Inicio" className="muted small">
+                      <td data-label="Início" className="muted small">
                         {formatDateTime(run.startedAt)}
                       </td>
                       <td data-label="Fonte">{run.sourceName ?? '—'}</td>

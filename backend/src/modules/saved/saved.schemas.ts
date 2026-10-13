@@ -15,6 +15,13 @@ export const updateGroupSchema = z
 export const savedListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(12),
+  /** Busca textual (FTS) restrita aos salvos — mesma semantica de /news. */
+  q: z.string().trim().min(1).max(200).optional(),
 });
 
 export type SavedListQueryInput = z.infer<typeof savedListQuerySchema>;
+
+/** Export de colecao: Markdown (leitura) ou JSON (backup fiel). */
+export const exportFormatSchema = z.object({
+  format: z.enum(['markdown', 'json']).default('markdown'),
+});

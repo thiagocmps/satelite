@@ -172,6 +172,16 @@ export type GroupSuggestion = {
   confidence: number;
 };
 
+/** Resultado do import de colecao (Markdown): o que entrou, o que ja la estava. */
+export type CollectionImportReport = {
+  group: NewsGroup;
+  total: number;
+  added: number;
+  already: number;
+  notFound: number;
+  missingTitles: string[];
+};
+
 /** Filtros da listagem de noticias (espelha a query da API). */
 export type NewsFilters = {
   q?: string;

@@ -63,6 +63,114 @@ export function extractJson(raw: string): string | null {
   return candidate.slice(start, end + 1);
 }
 
+/**
+ * Lote de classificacao: varios artigos por chamada. O catalogo e o prompt de
+ * sistema aparecem uma unica vez, entao o overhead fixo (que hoje se repete por
+ * artigo) vira um custo por lote — e o plano gratuito cobra por requisicao.
+ */
+export function buildClassifyBatchMessages(
+  inputs: ClassifyInput[],
+  options: { language: string; maxContentChars: number },
+): ChatMessage[] {
+  const catalog = inputs[0]
+    ? inputs[0].categories
+        .slice(0, CATALOG_MAX)
+        .map((category) => `- ${category.slug}: ${category.name}`)
+        .join('\n')
+    : '';
+
+  const blocks = inputs.map((input, index) => {
+    const parts = [`Titulo: ${input.title}`];
+    if (input.description) parts.push(`Descricao: ${truncate(stripHtml(input.description), DESCRIPTION_MAX)}`);
+    if (input.content) parts.push(`Texto: ${truncate(stripHtml(input.content), options.maxContentChars)}`);
+    return `[${index}] ${parts.join('\n')}`;
+  });
+
+  return [
+    { role: 'system', content: systemBatchPrompt(options.language) },
+    {
+      role: 'user',
+      content: [
+        'Categorias disponiveis:',
+        catalog,
+        '',
+        'Noticias para classificar (o numero entre colchetes e o id):',
+        blocks.join('\n\n'),
+        '',
+        'Responda somente com o JSON: {"results":[{"id": numero, "categorySlug": string ou null, "confidence": numero entre 0 e 1}]}',
+        `Inclua exatamente ${inputs.length} itens em "results", um por id, na mesma ordem.`,
+      ].join('\n'),
+    },
+  ];
+}
+
+function systemBatchPrompt(language: string): string {
+  return [
+    'Voce e um classificador de noticias de um agregador RSS.',
+    'O TITULO da noticia e a fonte principal da decisao; use a descricao e o texto apenas como apoio, nunca contra o titulo.',
+    `Responda em ${language}, apenas com JSON valido no formato pedido.`,
+    'Escolha a UNICA categoria mais adequada entre os slugs listados. Use exatamente um dos slugs fornecidos; nunca invente slugs.',
+    'Regras de ouro:',
+    '1. Conteudo ESPORTIVO nunca e classificado: futebol, automobilismo, tenis, xadrez, olimpiadas, vôlei, boxe ou qualquer outro esporte responde categorySlug: null.',
+    '2. Sem certeza suficiente (titulo generico, chamada para clique, preview sem conteudo) responde null em vez de adivinhar.',
+    '3. Noticia internacional (fora do Brasil) sem viés brasileiro vai para mundo; ciencia, tecnologia e economia internacionais mantem a categoria propria.',
+    '4. Confidence: alta (0.8+) quando o titulo sozinho deixa a categoria clara; 0.6-0.79 quando razoavel; abaixo de 0.6 nao classifica (null).',
+    'Exemplos (titulo -> categoria, confidence):',
+    `"Lula anuncia pacote contra a fome" -> {"categorySlug":"politica","confidence":0.95}`,
+    `"Terremoto deixa milhares desabrigados no Japao" -> {"categorySlug":"mundo","confidence":0.95}`,
+    `"Nova vacina contra dengue aprova fase 3" -> {"categorySlug":"ciencia","confidence":0.95}`,
+    `"Flamengo vence classico e assume a lideranca" -> {"categorySlug":null,"confidence":0.0}`,
+  ].join(' ');
+}
+
+/**
+ * Parsing do lote: devolve um veredito por indice de entrada. Um item ilegivel
+ * nao derruba o lote inteiro — vira `null` (aquele artigo permanece pendente e
+ * entra numa proxima rodada, possivelmente em lote menor).
+ */
+export function parseClassifiedBatch(
+  raw: string | null | undefined,
+  count: number,
+  categories: ClassifyCategory[],
+  minConfidence: number,
+): Array<ClassifyMention | null> {
+  const mentions: Array<ClassifyMention | null> = Array.from({ length: count }, () => null);
+  if (!raw) return mentions;
+
+  const json = extractJson(raw);
+  if (!json) return mentions;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return mentions;
+  }
+
+  const results = Array.isArray(parsed)
+    ? parsed
+    : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { results?: unknown }).results)
+      ? ((parsed as { results: unknown[] }).results)
+      : null;
+  if (!results) return mentions;
+
+  for (const entry of results) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) continue;
+    const record = entry as Record<string, unknown>;
+    const id = typeof record.id === 'number' ? record.id : Number(record.id);
+    if (!Number.isInteger(id) || id < 0 || id >= count) continue;
+
+    const mention = parseClassifiedContent(
+      JSON.stringify({ categorySlug: record.categorySlug ?? null, confidence: record.confidence ?? 0 }),
+      categories,
+      minConfidence,
+    );
+    mentions[id] = mention;
+  }
+
+  return mentions;
+}
+
 export type ClassifyMention = { categorySlug: string | null; confidence: number };
 
 /**

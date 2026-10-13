@@ -34,14 +34,35 @@ export class CompositeProvider implements AiProvider {
     return this.#run((provider) => provider.classify(input));
   }
 
+  /**
+   * Lote: passa para o primeiro provedor da cadeia que suporta. Provedor sem
+   * suporte e pulado (nao e falha); se nenhum suportar, lança AI_BATCH_UNSUPPORTED
+   * e o servico cai para uma chamada por artigo.
+   */
+  async classifyBatch(inputs: ClassifyInput[]): Promise<AiSummaryResult> {
+    const supporting = this.providers.filter((provider) => typeof provider.classifyBatch === 'function');
+    if (supporting.length === 0) {
+      throw new ExternalServiceError('AI_BATCH_UNSUPPORTED', 'Nenhum provedor da cadeia suporta lote de classificacao');
+    }
+    return this.#runOn(supporting, (provider) => (provider.classifyBatch as (i: ClassifyInput[]) => Promise<AiSummaryResult>)(inputs));
+  }
+
   async suggestGroup(input: SuggestGroupInput): Promise<AiSummaryResult> {
     return this.#run((provider) => provider.suggestGroup(input));
   }
 
   async #run(run: (provider: AiProvider) => Promise<AiSummaryResult>): Promise<AiSummaryResult> {
+    return this.#runOn(this.providers, run);
+  }
+
+  /** Falhaover sobre um subconjunto da cadeia (ex.: só quem suporta lote). */
+  async #runOn(
+    providers: AiProvider[],
+    run: (provider: AiProvider) => Promise<AiSummaryResult>,
+  ): Promise<AiSummaryResult> {
     let lastError: unknown;
 
-    for (const provider of this.providers) {
+    for (const provider of providers) {
       try {
         return await run(provider);
       } catch (error) {

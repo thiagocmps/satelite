@@ -6,6 +6,7 @@ import type {
   CategoryRule,
   ClassificationReport,
   ClassificationStatus,
+  CollectionImportReport,
   GroupSuggestion,
   IngestionReport,
   IngestionRun,
@@ -119,8 +120,28 @@ export function createGroup(input: { name: string; color?: string | null }): Pro
   return api.post<{ data: NewsGroup }>('/groups', input);
 }
 
+export function updateGroup(
+  id: string,
+  patch: { name?: string; color?: string | null },
+): Promise<{ data: NewsGroup }> {
+  return api.patch<{ data: NewsGroup }>(`/groups/${id}`, patch);
+}
+
 export function deleteGroup(id: string): Promise<void> {
   return api.delete<void>(`/groups/${id}`);
+}
+
+/** Importa colecao de um Markdown (o mesmo formato do export). Corpo cru. */
+export function importCollection(raw: string): Promise<{ data: CollectionImportReport }> {
+  return api.postRaw<{ data: CollectionImportReport }>('/groups/import', raw);
+}
+
+/**
+ * URL de download da coleção. E um link comum (nao fetch): o navegador baixa
+ * direto, com o content-disposition que o backend manda.
+ */
+export function exportGroupUrl(id: string, format: 'markdown' | 'json' = 'markdown'): string {
+  return `/api/v1/groups/${id}/export${buildQuery({ format })}`;
 }
 
 export function saveArticleToGroup(groupId: string, articleId: string): Promise<void> {
@@ -131,12 +152,17 @@ export function removeArticleFromGroup(groupId: string, articleId: string): Prom
   return api.delete<void>(`/groups/${groupId}/articles/${articleId}`);
 }
 
-export function fetchGroupArticles(groupId: string, page = 1, limit = 12): Promise<Paginated<Article>> {
-  return api.get<Paginated<Article>>(`/groups/${groupId}/articles${buildQuery({ page, limit })}`);
+export function fetchGroupArticles(
+  groupId: string,
+  page = 1,
+  limit = 12,
+  q = '',
+): Promise<Paginated<Article>> {
+  return api.get<Paginated<Article>>(`/groups/${groupId}/articles${buildQuery({ page, limit, q })}`);
 }
 
-export function fetchSaved(page = 1, limit = 12): Promise<Paginated<Article>> {
-  return api.get<Paginated<Article>>(`/saved${buildQuery({ page, limit })}`);
+export function fetchSaved(page = 1, limit = 12, q = ''): Promise<Paginated<Article>> {
+  return api.get<Paginated<Article>>(`/saved${buildQuery({ page, limit, q })}`);
 }
 
 export function fetchSavedIds(): Promise<{ data: SavedIds }> {

@@ -1,8 +1,9 @@
-import { Router, type RequestHandler } from 'express';
+import { Router, text, type RequestHandler } from 'express';
 import { validate } from '../../middleware/validate.middleware.js';
 import {
   articleIdBodySchema,
   createGroupSchema,
+  exportFormatSchema,
   groupIdParamsSchema,
   savedListQuerySchema,
   savedParamsSchema,
@@ -23,9 +24,13 @@ export function createSavedRoutes(
   router.get('/groups', controller.listGroups);
   router.post('/groups', validate({ body: createGroupSchema }), controller.createGroup);
   router.post('/groups/suggest', suggestLimiter, validate({ body: articleIdBodySchema }), controller.suggest);
+  // corpo cru (Markdown do arquivo): express.text montado so nesta rota
+  router.post('/groups/import', text({ limit: '2mb', type: () => true }), controller.importGroup);
   router.patch('/groups/:id', validate({ params: groupIdParamsSchema, body: updateGroupSchema }), controller.updateGroup);
   router.delete('/groups/:id', validate({ params: groupIdParamsSchema }), controller.removeGroup);
   router.get('/groups/:id/articles', validate({ params: groupIdParamsSchema, query: savedListQuerySchema }), controller.listGroupArticles);
+  // export vem depois de /articles, com segmento próprio: não colide com :id
+  router.get('/groups/:id/export', validate({ params: groupIdParamsSchema, query: exportFormatSchema }), controller.exportGroup);
   router.put('/groups/:id/articles/:articleId', validate({ params: savedParamsSchema }), controller.save);
   router.delete('/groups/:id/articles/:articleId', validate({ params: savedParamsSchema }), controller.unsave);
 

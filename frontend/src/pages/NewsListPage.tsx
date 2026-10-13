@@ -61,13 +61,15 @@ export function NewsListPage() {
   const ingest = useIngestNow();
 
   const total = news.data?.pagination.total ?? 0;
+  // filtros que mudam o resultado (a ordenacao so reordena, nao filtra)
+  const hasFilters = Boolean(filters.q || filters.category || filters.source || filters.from || filters.to);
 
   return (
     <>
       <PageHeader
-        title="Noticias"
+        title="Notícias"
         eyebrow="MISSÃO · RECEPÇÃO CONTÍNUA"
-        description="Agregacao de fontes RSS publicas com busca e filtros."
+        description="Agregação de fontes RSS públicas com busca, filtros e resumo por IA."
         action={
           <button type="button" className="button" onClick={() => ingest.mutate({})} disabled={ingest.isPending}>
             {ingest.isPending ? (
@@ -99,7 +101,7 @@ export function NewsListPage() {
         <span>
           {news.isPending
             ? 'Carregando…'
-            : `${total} ${total === 1 ? 'noticia' : 'noticias'}${filters.q ? ` para “${filters.q}”` : ''}`}
+            : `${total} ${total === 1 ? 'notícia' : 'notícias'}${filters.q ? ` para “${filters.q}”` : ''}`}
         </span>
         {news.isFetching && !news.isPending ? <span className="faint">atualizando…</span> : null}
       </div>
@@ -113,7 +115,27 @@ export function NewsListPage() {
       {news.data && news.data.data.length === 0 ? (
         <EmptyState
           title="Nenhuma noticia encontrada"
-          hint="Ajuste os filtros, amplie o periodo ou rode a ingestao pela pagina Fontes."
+          hint={
+            hasFilters
+              ? 'Nada bate com estes filtros — limpe para ver o fluxo completo.'
+              : 'O banco está vazio: rode a ingestão para puxar as fontes.'
+          }
+          action={
+            hasFilters ? (
+              <button type="button" className="button button--sm" onClick={clearFilters}>
+                ✕ Limpar filtros
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button button--sm"
+                onClick={() => ingest.mutate({})}
+                disabled={ingest.isPending}
+              >
+                {ingest.isPending ? 'Ingerindo…' : '⟳ Ingerir agora'}
+              </button>
+            )
+          }
         />
       ) : null}
 

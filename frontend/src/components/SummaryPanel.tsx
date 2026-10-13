@@ -19,7 +19,7 @@ export function SummaryPanel({ articleId }: { articleId: string }) {
         Resumo
       </h2>
       <p className="panel__hint">
-        Gerado por um modelo de linguagem e salvo no banco: o mesmo resumo e reaproveitado, sem chamar a IA de novo.
+        Gerado por um modelo de linguagem e salvo no banco: o mesmo resumo é reaproveitado, sem chamar a IA de novo.
       </p>
 
       {summary ? (
@@ -35,11 +35,11 @@ export function SummaryPanel({ articleId }: { articleId: string }) {
       ) : summaryQuery.isPending ? (
         <div className="skeleton" style={{ height: 110 }} aria-hidden="true" />
       ) : summaryQuery.isError ? (
-        <p className="small muted">Nao foi possivel consultar o resumo salvo.</p>
+        <p className="small muted">Não foi possível consultar o resumo salvo.</p>
       ) : (
         <p className="small muted">
-          Nenhum resumo gerado para esta noticia ainda. A geracao consome a cota gratuita da OpenRouter, entao
-          resumo e gerado sob demanda.
+          Nenhum resumo gerado para esta notícia ainda. A geração consome a cota gratuita da OpenRouter, então
+          o resumo é gerado sob demanda.
         </p>
       )}
 

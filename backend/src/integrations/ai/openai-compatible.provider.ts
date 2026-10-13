@@ -1,6 +1,6 @@
 import { ExternalServiceError, TimeoutError } from '../../core/errors.js';
 import { fetchWithTimeout } from '../../core/http.js';
-import { buildClassifyMessages } from './ai.classify.js';
+import { buildClassifyBatchMessages, buildClassifyMessages } from './ai.classify.js';
 import { buildSuggestGroupMessages } from './ai.group.js';
 import type {
   AiProvider,
@@ -95,6 +95,19 @@ export class OpenAICompatibleProvider implements AiProvider {
     return this.#runJson((model) => this.#classifyBody(model, input));
   }
 
+  /**
+   * Lote de classificacao: mesmo fluxo de uma unica (retry, fallback de modelo,
+   * JSON estrito) com o prompt montado para varios artigos. E aqui que o custo
+   * cai — uma requisicao no lugar de N.
+   */
+  async classifyBatch(inputs: ClassifyInput[]): Promise<AiSummaryResult> {
+    if (inputs.length === 0) {
+      throw new ExternalServiceError('AI_BAD_RESPONSE', 'Lote de classificacao vazio');
+    }
+    if (inputs.length === 1) return this.classify(inputs[0] as ClassifyInput);
+    return this.#runJson((model) => this.#classifyBatchBody(model, inputs));
+  }
+
   async suggestGroup(input: SuggestGroupInput): Promise<AiSummaryResult> {
     return this.#runJson((model) => this.#suggestGroupBody(model, input));
   }
@@ -168,6 +181,18 @@ export class OpenAICompatibleProvider implements AiProvider {
       messages: buildClassifyMessages(input, { language: this.config.language, maxContentChars: this.config.maxContentChars }),
       temperature: 0,
       // JSON estrito: o modelo deve responder somente com o objeto de classificacao
+      response_format: { type: 'json_object' },
+    };
+  }
+
+  #classifyBatchBody(model: string, inputs: ClassifyInput[]): ChatRequestBody {
+    return {
+      model,
+      messages: buildClassifyBatchMessages(inputs, {
+        language: this.config.language,
+        maxContentChars: this.config.maxContentChars,
+      }),
+      temperature: 0,
       response_format: { type: 'json_object' },
     };
   }

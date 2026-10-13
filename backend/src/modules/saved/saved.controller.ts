@@ -50,9 +50,30 @@ export function createSavedController(saved: SavedService) {
       res.json({ data: await saved.listSavedIds() });
     },
 
+    /** Download da coleção em Markdown (leitura) ou JSON (backup). */
+    exportGroup: async (req: Request, res: Response) => {
+      const { id } = valid<{ id: string }>(req, 'params');
+      const { format } = valid<{ format: 'markdown' | 'json' }>(req, 'query');
+      const file = await saved.exportGroup(id, format);
+      res
+        .status(200)
+        .setHeader('content-type', file.contentType)
+        .setHeader('content-disposition', `attachment; filename="${file.filename}"`)
+        .send(file.body);
+    },
+
     suggest: async (req: Request, res: Response) => {
       const { articleId } = valid<{ articleId: string }>(req, 'body');
       res.json({ data: await saved.suggestGroup(articleId) });
+    },
+
+    /**
+     * Corpo cru: o Markdown do arquivo, lido pelo text() da rota (mesmo
+     * arranjo do import de fontes). Erros de formato viram 400.
+     */
+    importGroup: async (req: Request, res: Response) => {
+      const markdown = typeof req.body === 'string' ? req.body : '';
+      res.status(201).json({ data: await saved.importGroup(markdown) });
     },
   };
 }

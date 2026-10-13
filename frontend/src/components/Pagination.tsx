@@ -13,7 +13,7 @@ export function Pagination({ pagination, onPageChange }: Props) {
   const last = Math.min(page * pagination.limit, total);
 
   return (
-    <nav className="pagination" aria-label="Paginacao">
+    <nav className="pagination" aria-label="Paginação">
       <button
         type="button"
         className="button button--sm"

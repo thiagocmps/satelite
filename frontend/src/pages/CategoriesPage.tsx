@@ -66,7 +66,7 @@ export function CategoriesPage() {
       <PageHeader
         title="Categorias"
         eyebrow="MISSÃO · MAPA DE TEMAS"
-        description="Organize as noticias por tema. As palavras-chave sao aplicadas na ingestao: a regra que casar vence a categoria padrao da fonte."
+        description="Organize as notícias por tema. As palavras-chave são aplicadas na ingestão: a regra que casar vence a categoria padrão da fonte."
       />
 
       {error ? <ErrorBox message={error.message} /> : null}
@@ -74,7 +74,7 @@ export function CategoriesPage() {
       <div className="stack">
         <section className="panel">
           <h2 className="panel__title">Nova categoria</h2>
-          <p className="panel__hint">O slug e usado na URL e na API; se ficar vazio, geramos a partir do nome.</p>
+          <p className="panel__hint">O slug é usado na URL e na API; se ficar vazio, geramos a partir do nome.</p>
 
           <form className="form-grid" onSubmit={submitCategory}>
             <div className="field">
@@ -141,7 +141,7 @@ export function CategoriesPage() {
           <section className="panel">
             <h2 className="panel__title">Categorias e palavras-chave</h2>
             <p className="panel__hint">
-              Remover uma categoria deixa as noticias sem categoria (o historico e preservado).
+              Remover uma categoria deixa as notícias sem categoria (o histórico é preservado).
             </p>
 
             <div className="stack">
@@ -154,16 +154,12 @@ export function CategoriesPage() {
                     <div className="row">
                       <span
                         aria-hidden="true"
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: 4,
-                          background: category.color ?? 'var(--border-strong)',
-                        }}
+                        className="category-dot"
+                        style={{ background: category.color ?? 'var(--border-strong)' }}
                       />
                       <strong>{category.name}</strong>
                       <span className="mono">/{category.slug}</span>
-                      <span className="badge">{category.articleCount} noticias</span>
+                      <span className="badge">{category.articleCount} notícias</span>
                       <span className="spacer" />
                       <button
                         type="button"

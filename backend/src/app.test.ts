@@ -268,6 +268,189 @@ describe('POST /api/v1/sources/import', () => {
   });
 });
 
+describe('GET /api/v1/groups/:id/export', () => {
+  const groupId = '11111111-1111-4111-8111-111111111111';
+  const group = {
+    id: groupId,
+    name: 'Eleições 2026',
+    color: '#ff6b6b',
+    savedCount: 1,
+    createdAt: new Date('2026-10-01T12:00:00.000Z'),
+  };
+  const article = {
+    id: 'a-1',
+    title: 'TSE define calendário eleitoral',
+    description: 'Divulgação das datas oficiais.',
+    content: null,
+    imageUrl: null,
+    author: 'Redação',
+    url: 'https://exemplo.com/tse-calendario',
+    publishedAt: '2026-10-02T09:00:00.000Z',
+    ingestedAt: '2026-10-02T09:05:00.000Z',
+    source: { id: 's-1', slug: 'g1', name: 'G1 Globo', siteUrl: 'https://g1.globo.com' },
+    category: { id: 'c-1', slug: 'politica', name: 'Política', color: null },
+    categoryMethod: 'ai',
+    categoryConfidence: 0.9,
+    summary: {
+      text: 'TSE divulgou o calendário.',
+      generatedByAi: true,
+      provider: 'openrouter',
+      model: 'modelo-teste',
+      promptVersion: 'v1',
+      language: 'pt-BR',
+      createdAt: '2026-10-02T10:00:00.000Z',
+      updatedAt: '2026-10-02T10:00:00.000Z',
+      tokensIn: 10,
+      tokensOut: 5,
+    },
+  };
+
+  it('faz download em Markdown por padrao', async () => {
+    container.savedRepository.findGroupById = async () => group as never;
+    container.savedRepository.listGroupArticlesForExport = async () => [article] as never;
+
+    const response = await request(app).get(`/api/v1/groups/${groupId}/export`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('text/markdown');
+    expect(response.headers['content-disposition']).toContain(
+      'attachment; filename="satelite-colecao-eleicoes-2026-',
+    );
+    expect(response.text).toContain('# Eleições 2026');
+    expect(response.text).toContain('1 notícia · exportado de Satelite em');
+    expect(response.text).toContain('## 1. TSE define calendário eleitoral');
+    expect(response.text).toContain('[G1 Globo](https://g1.globo.com) · 2 de outubro de 2026 · Política');
+    expect(response.text).toContain('> TSE divulgou o calendário.');
+    expect(response.text).toContain('[Ler original](https://exemplo.com/tse-calendario)');
+  });
+
+  it('gera JSON quando pedido', async () => {
+    const response = await request(app).get(`/api/v1/groups/${groupId}/export?format=json`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(response.headers['content-disposition']).toContain('.json');
+    expect(response.body.data.group.name).toBe('Eleições 2026');
+    expect(response.body.data.articles[0].url).toBe('https://exemplo.com/tse-calendario');
+  });
+
+  it('404 quando o grupo nao existe', async () => {
+    container.savedRepository.findGroupById = async () => null;
+
+    const response = await request(app).get(`/api/v1/groups/${groupId}/export`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('rejeita formato desconhecido', async () => {
+    const response = await request(app).get(`/api/v1/groups/${groupId}/export?format=csv`);
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('POST /api/v1/groups/import', () => {
+  const markdown = `# Missão Lunar
+
+1 notícia · exportado de Satelite em 1 de outubro de 2026
+
+## 1. Sonda entra em órbita
+
+[Agência](https://agencia.com) · 1 de outubro de 2026
+
+[Ler original](https://exemplo.com/sonda)
+
+## 2. Notícia fora do banco
+
+[Agência](https://agencia.com) · 2 de outubro de 2026
+
+[Ler original](https://exemplo.com/fora-do-banco)
+`;
+
+  it('importa o Markdown e devolve o relatorio', async () => {
+    const group = {
+      id: '22222222-2222-4222-8222-222222222222',
+      name: 'Missão Lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    container.savedRepository.findGroupByName = async () => null;
+    container.savedRepository.createGroup = async () => group as never;
+    container.savedRepository.findArticleIdsByUrls = async () =>
+      new Map([['https://exemplo.com/sonda', 'a-1']]);
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async () => 1;
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send(markdown);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({
+      group: { id: group.id, name: 'Missão Lunar' },
+      total: 2,
+      added: 1,
+      already: 0,
+      notFound: 1,
+    });
+    expect(response.body.data.missingTitles).toEqual(['Notícia fora do banco']);
+  });
+
+  it('reusa a colecao de mesmo nome em vez de criar outra', async () => {
+    const group = {
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'missão lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    let created = false;
+    container.savedRepository.findGroupByName = async (name: string) =>
+      name.toLowerCase() === 'missão lunar' ? group : null;
+    container.savedRepository.createGroup = async () => {
+      created = true;
+      return group as never;
+    };
+    container.savedRepository.findArticleIdsByUrls = async () => new Map();
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async () => 0;
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send(markdown);
+
+    expect(response.status).toBe(201);
+    expect(created).toBe(false);
+    expect(response.body.data.group.id).toBe(group.id);
+    expect(response.body.data).toMatchObject({ total: 2, added: 0, notFound: 2 });
+  });
+
+  it('400 quando o arquivo nao tem titulo de colecao', async () => {
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send('## 1. Sonda\n\n[Ler original](https://exemplo.com/sonda)');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.message).toMatch(/titulo da colecao/);
+  });
+
+  it('400 quando o arquivo esta vazio', async () => {
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send('   ');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toMatch(/vazio/);
+  });
+});
+
 describe('rotas inexistentes', () => {
   it('404 padronizado', async () => {
     const response = await request(app).get('/api/v1/nao-existe');

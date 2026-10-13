@@ -51,6 +51,13 @@ export interface AiProvider {
    */
   classify(input: ClassifyInput): Promise<AiSummaryResult>;
   /**
+   * Classifica varios artigos em UMA chamada. O custo do plano gratuito e por
+   * requisicao, entao agrupar N artigos num lote corta o overhead de ~N prompts
+   * de sistema repetidos para 1. O provedor que nao suportar lote deixa o
+   * metodo ausente e o servico cai para chamadas uma a uma.
+   */
+  classifyBatch?(inputs: ClassifyInput[]): Promise<AiSummaryResult>;
+  /**
    * Sugere em qual grupo salvo a noticia se encaixa — ou um nome para um grupo
    * novo. Responde o mesmo JSON cru das outras chamadas; o parsing fica no
    * service. Deve lancar AppError em falha.

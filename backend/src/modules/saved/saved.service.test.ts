@@ -29,9 +29,14 @@ const article: Article = {
 
 function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> = {}) {
   const saved: Array<[string, string]> = [];
+  const created: Array<{ name: string }> = [];
   const repository = {
     findGroupById: async (id: string) => (id === 'g-1' ? group : null),
     updateGroup: async () => null,
+    createGroup: async (input: { name: string }) => {
+      created.push(input);
+      return { ...group, name: input.name };
+    },
     save: async (groupId: string, articleId: string) => {
       saved.push([groupId, articleId]);
     },
@@ -57,7 +62,7 @@ function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> 
 
   const service = new SavedService({ repository, news, provider, language: 'pt-BR', maxContentChars: 500, minConfidence: 0.6, logger } satisfies SavedDeps);
 
-  return { service, saved };
+  return { service, saved, created };
 }
 
 describe('SavedService', () => {
@@ -80,6 +85,12 @@ describe('SavedService', () => {
   it('404 ao atualizar grupo inexistente', async () => {
     const { service } = setup();
     await expect(service.updateGroup('g-x', { name: 'Novo' })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('normaliza espacos internos do nome ao criar', async () => {
+    const { service, created } = setup();
+    await service.createGroup({ name: '  Eleicoes   2026  ' });
+    expect(created[0]?.name).toBe('Eleicoes 2026');
   });
 
   it('sugere um grupo existente', async () => {

@@ -75,6 +75,8 @@ const schema = z
     AI_CLASSIFY_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(45_000),
     AI_CLASSIFY_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_CLASSIFY_BATCH: z.coerce.number().int().min(1).max(500).default(25),
+    // Artigos por requisicao de IA (lote). 1 = comportamento antigo, uma chamada por noticia.
+    AI_CLASSIFY_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),
     AI_CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
     AI_CLASSIFY_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
     AI_CLASSIFY_MIN_TEXT_CHARS: z.coerce.number().int().min(0).default(120),

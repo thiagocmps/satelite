@@ -11,15 +11,7 @@ export interface NewsRepository {
   insertMany(articles: NormalizedArticle[]): Promise<{ inserted: number; duplicates: number }>;
 }
 
-/** Projecao completa de artigo (com fonte, categoria e ultimo resumo). Reusada por outros repositorios. */
-export const SELECT_ARTICLE = `
-  select a.id, a.title, a.description, a.content, a.image_url, a.author, a.url, a.published_at, a.ingested_at,
-         a.category_method, a.category_confidence,
-         s.id as source_id, s.slug as source_slug, s.name as source_name, s.site_url as source_site_url,
-         c.id as category_id, c.slug as category_slug, c.name as category_name, c.color as category_color,
-         sm.summary, sm.provider, sm.model, sm.prompt_version, sm.language as summary_language,
-         sm.created_at as summary_created_at, sm.updated_at as summary_updated_at,
-         sm.tokens_in, sm.tokens_out
+const ARTICLE_JOINS = `
   from articles a
   join sources s on s.id = a.source_id
   left join categories c on c.id = a.category_id
@@ -30,6 +22,28 @@ export const SELECT_ARTICLE = `
      limit 1
   ) sm on true
 `;
+
+const ARTICLE_COLUMNS = `
+  a.id, a.title, a.description, a.image_url, a.author, a.url, a.published_at, a.ingested_at,
+  a.category_method, a.category_confidence,
+  s.id as source_id, s.slug as source_slug, s.name as source_name, s.site_url as source_site_url,
+  c.id as category_id, c.slug as category_slug, c.name as category_name, c.color as category_color,
+  sm.summary, sm.provider, sm.model, sm.prompt_version, sm.language as summary_language,
+  sm.created_at as summary_created_at, sm.updated_at as summary_updated_at,
+  sm.tokens_in, sm.tokens_out
+`;
+
+/**
+ * Projecao de detalhe: com o texto completo. Reusada por outros repositorios
+ * (ex.: o servico de salvos valida a existencia da noticia via findById).
+ */
+export const SELECT_ARTICLE = `select ${ARTICLE_COLUMNS}, a.content ${ARTICLE_JOINS}`;
+
+/**
+ * Projecao de lista/card: sem `a.content`. O corpo (que pode ter dezenas de KB)
+ * nunca aparece em listagem — so no detalhe. Corte tipico de >70% no payload.
+ */
+export const SELECT_ARTICLE_CARD = `select ${ARTICLE_COLUMNS} ${ARTICLE_JOINS}`;
 
 const INSERT_COLUMNS = [
   'source_id',
@@ -117,15 +131,29 @@ export const toArticle = (row: ArticleRow): Article => ({
   summary: toSummary(row),
 });
 
+/**
+ * Clause de busca por texto (FTS). Compartilhada com o modulo de salvos: o
+ * mesmo `search_vector` que ranqueia /news tambem filtra as colecoes, sem
+ * duplicar a expressao nem o fallback por prefixo.
+ */
+export function buildSearchClause(q: string, startIndex: number): { clause: string; params: unknown[] } {
+  // tsvector usa o indice GIN; o ILIKE cobre prefixos que o stemming nao encontra.
+  return {
+    clause: `(a.search_vector @@ websearch_to_tsquery('portuguese', $${startIndex}::text)
+              or a.title ilike '%' || $${startIndex}::text || '%')`,
+    params: [q],
+  };
+}
+
 /** Clausula WHERE compartilhada entre a contagem e a pagina de resultados. */
 export function buildFilters(query: NewsListQuery): { clause: string; params: unknown[] } {
   const params: unknown[] = [];
   const parts: string[] = [];
 
   if (query.q) {
-    params.push(query.q);
-    // tsvector usa o indice GIN; o ILIKE cobre prefixos que o stemming nao encontra.
-    parts.push(`(a.search_vector @@ websearch_to_tsquery('portuguese', $1::text) or a.title ilike '%' || $1::text || '%')`);
+    const search = buildSearchClause(query.q, params.length + 1);
+    params.push(...search.params);
+    parts.push(search.clause);
   }
   if (query.categoryId) {
     params.push(query.categoryId);
@@ -169,7 +197,7 @@ export class PgNewsRepository implements NewsRepository {
     const total = counted.rows[0]?.total ?? 0;
 
     const page = await this.db.query(
-      `${SELECT_ARTICLE} ${clause} order by ${orderBy} limit $${params.length + 1} offset $${params.length + 2}`,
+      `${SELECT_ARTICLE_CARD} ${clause} order by ${orderBy} limit $${params.length + 1} offset $${params.length + 2}`,
       [...params, query.limit, (query.page - 1) * query.limit],
     );
 

@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { SatelliteIcon } from './SatelliteIcon';
+import { UpdateToast } from './UpdateToast';
 
 const links = [
-  { to: '/', label: 'Noticias', end: true },
-  { to: '/salvos', label: 'Salvos', end: false },
+  { to: '/', label: 'Notícias', end: true },
+  { to: '/salvos', label: 'Coleções', end: false },
   { to: '/categorias', label: 'Categorias', end: false },
   { to: '/fontes', label: 'Fontes', end: false },
 ];
@@ -20,7 +21,7 @@ export function Layout() {
             Satelite
           </NavLink>
 
-          <nav className="nav" aria-label="Navegacao principal">
+          <nav className="nav" aria-label="Navegação principal">
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -46,12 +47,13 @@ export function Layout() {
           <p style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
             <span className="footer__signal" aria-hidden="true" />
             <span>
-              Transmitido da orbita baixa — fontes RSS publicas + resumo por IA. Conteúdo e resumo
-              pertencem aos respectivos autores; a marcação de resumo indica texto gerado por modelo.
+              Transmitindo da órbita baixa — fontes RSS públicas + resumo por IA.
             </span>
           </p>
         </div>
       </footer>
+
+      <UpdateToast />
     </div>
   );
 }

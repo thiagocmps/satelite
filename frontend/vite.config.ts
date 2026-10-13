@@ -6,7 +6,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' em vez de 'autoUpdate': o navegador baixa a nova versão em
+      // silêncio, mas quem decide recarregar é o usuário (via toast). Com
+      // autoUpdate a página se recarrega sozinha no meio do que a pessoa lê.
+      registerType: 'prompt',
       // assets extras copiados do public/ que podem entrar no precache
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {

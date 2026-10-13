@@ -184,7 +184,8 @@ export function useRunClassification(onSuccess?: (report: ClassificationReport) 
 export const savedKeys = {
   groups: ['saved', 'groups'] as const,
   ids: ['saved', 'ids'] as const,
-  list: (groupId: string | null, page: number) => ['saved', 'list', groupId ?? 'all', page] as const,
+  list: (groupId: string | null, page: number, q: string) =>
+    ['saved', 'list', groupId ?? 'all', page, q] as const,
 };
 
 export function useGroups() {
@@ -196,11 +197,11 @@ export function useSavedIds() {
   return useQuery({ queryKey: savedKeys.ids, queryFn: api.fetchSavedIds });
 }
 
-/** Noticias salvas: de um grupo especifico ou de todos (groupId null). */
-export function useSavedArticles(groupId: string | null, page: number) {
+/** Noticias salvas: de um grupo especifico ou de todos (groupId null). `q` usa FTS. */
+export function useSavedArticles(groupId: string | null, page: number, q = '') {
   return useQuery({
-    queryKey: savedKeys.list(groupId, page),
-    queryFn: () => (groupId ? api.fetchGroupArticles(groupId, page) : api.fetchSaved(page)),
+    queryKey: savedKeys.list(groupId, page, q),
+    queryFn: () => (groupId ? api.fetchGroupArticles(groupId, page, 12, q) : api.fetchSaved(page, 12, q)),
     placeholderData: (previous) => previous,
   });
 }
@@ -209,6 +210,25 @@ export function useCreateGroup() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: api.createGroup,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+/** Renomear/repintar coleção — mesmos campos do PATCH /groups/:id. */
+export function useUpdateGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; color?: string | null } }) =>
+      api.updateGroup(id, patch),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
+  });
+}
+
+/** Importar coleção de Markdown: cria/reusa o grupo e revalida a lista. */
+export function useImportCollection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.importCollection,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['saved'] }),
   });
 }
