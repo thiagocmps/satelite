@@ -34,26 +34,71 @@ body::after {
 
 body::before {
   background:
-    radial-gradient(640px 420px at 12% 8%, color-mix(in srgb, var(--nebula) 16%, transparent), transparent 65%),
-    radial-gradient(760px 520px at 88% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 65%),
-    radial-gradient(900px 640px at 50% 115%, color-mix(in srgb, var(--nebula) 13%, transparent), transparent 65%);
+    radial-gradient(700px 460px at 12% 8%, color-mix(in srgb, var(--nebula) 26%, transparent), transparent 68%),
+    radial-gradient(820px 560px at 88% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 68%),
+    radial-gradient(980px 700px at 50% 112%, color-mix(in srgb, var(--nebula) 20%, transparent), transparent 68%),
+    radial-gradient(620px 420px at 74% 64%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 72%);
 }
 
+/* Campo de estrelas em tres escalas (nevoa fina / médias / brilhos fortes).
+   Tiles de tamanhos diferentes quebram a repetição do padrao; nada anima,
+   entao `prefers-reduced-motion` nao precisa tratar nada aqui. */
 body::after {
   background-image:
+    /* camada 1 — nevoa fina (muitas, 1px) */
     radial-gradient(1px 1px at 32px 24px, var(--star), transparent 1.6px),
-    radial-gradient(1.5px 1.5px at 92px 118px, var(--star), transparent 2.2px),
+    radial-gradient(1px 1px at 118px 62px, var(--star), transparent 1.6px),
     radial-gradient(1px 1px at 152px 58px, var(--star), transparent 1.6px),
-    radial-gradient(1.5px 1.5px at 214px 182px, var(--star), transparent 2.2px),
     radial-gradient(1px 1px at 58px 224px, var(--star), transparent 1.6px),
-    radial-gradient(1px 1px at 262px 262px, var(--star), transparent 1.6px);
-  background-size: 300px 300px;
-  opacity: 0.22;
+    radial-gradient(1px 1px at 262px 262px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 206px 148px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 84px 168px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 288px 96px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 174px 288px, var(--star), transparent 1.6px),
+    radial-gradient(1px 1px at 46px 106px, var(--star), transparent 1.6px),
+    /* camada 2 — médias (1.6px), levemente mais azuladas */
+    radial-gradient(1.6px 1.6px at 92px 118px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    radial-gradient(1.6px 1.6px at 214px 182px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    radial-gradient(1.6px 1.6px at 140px 34px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    radial-gradient(1.6px 1.6px at 24px 268px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    radial-gradient(1.6px 1.6px at 276px 224px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    radial-gradient(1.6px 1.6px at 160px 240px, color-mix(in srgb, var(--star) 88%, var(--accent)), transparent 2.4px),
+    /* camada 3 — poucas fortes (2.6px), com halo largo */
+    radial-gradient(4.5px 4.5px at 190px 70px, color-mix(in srgb, var(--star) 45%, transparent), transparent 70%),
+    radial-gradient(2.6px 2.6px at 190px 70px, var(--star), transparent 4px),
+    radial-gradient(4.5px 4.5px at 66px 196px, color-mix(in srgb, var(--star) 45%, transparent), transparent 70%),
+    radial-gradient(2.6px 2.6px at 66px 196px, var(--star), transparent 4px),
+    radial-gradient(4.5px 4.5px at 248px 300px, color-mix(in srgb, var(--star) 45%, transparent), transparent 70%),
+    radial-gradient(2.6px 2.6px at 248px 300px, var(--star), transparent 4px);
+  background-size:
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    320px 320px,
+    640px 640px,
+    640px 640px,
+    640px 640px,
+    640px 640px,
+    640px 640px,
+    640px 640px;
+  opacity: 0.8;
 }
 
 @media (prefers-color-scheme: dark) {
   body::after {
-    opacity: 0.55;
+    opacity: 0.95;
   }
 }
 
@@ -190,6 +235,9 @@ textarea {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
+/* Transparente de proposito: o fundo opaco mora no `body`, e os halos daqui
+   sao translucidos — se `var(--bg)` viesse junto, taparia as estrelas e as
+   nebulosas do body::before/::after (fixas, em z-index negativo). */
 .site-main {
   flex: 1;
   padding-block: var(--sp-6) var(--sp-7);
@@ -197,8 +245,7 @@ textarea {
   background:
     radial-gradient(1400px 700px at 8% -12%, color-mix(in srgb, var(--accent) 5%, transparent), transparent),
     radial-gradient(1100px 600px at 105% 8%, color-mix(in srgb, var(--nebula) 4%, transparent), transparent),
-    radial-gradient(900px 520px at 50% -20%, color-mix(in srgb, var(--star) 2%, transparent), transparent),
-    var(--bg);
+    radial-gradient(900px 520px at 50% -20%, color-mix(in srgb, var(--star) 2%, transparent), transparent);
 }
 
 .site-footer {
