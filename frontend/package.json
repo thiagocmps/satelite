@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "generate-pwa-assets": "pwa-assets-generator -c pwa-assets.config.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",

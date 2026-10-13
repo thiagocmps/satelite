@@ -11,7 +11,12 @@ export default defineConfig({
       // autoUpdate a página se recarrega sozinha no meio do que a pessoa lê.
       registerType: 'prompt',
       // assets extras copiados do public/ que podem entrar no precache
-      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon.ico',
+        'apple-touch-icon-180x180.png',
+        'maskable-icon-192x192.png',
+      ],
       manifest: {
         name: 'Satelite',
         short_name: 'Satelite',
@@ -22,10 +27,17 @@ export default defineConfig({
         scope: '/',
         theme_color: '#05070b',
         background_color: '#0b1630',
+        // Gerados por `npm run generate-pwa-assets` (ver pwa-assets.config.mjs).
+        // Dois motivos de listar os dois tamanhos de maskable: launchers Android
+        // escolhem o ícone maskable mais próximo do tamanho da célula, e sem o
+        // de 192 o Samsung caía no `any` com cantos redondados por conta dele.
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'maskable-icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
         ],
       },
       workbox: {
