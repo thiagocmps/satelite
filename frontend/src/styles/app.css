@@ -1245,6 +1245,92 @@ textarea {
   opacity: 0.6;
 }
 
+/* --------------------------------------------------- compartilhar (story) */
+
+.share {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.share__error {
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+/* dialogo centrado em portal — mesmo desenho do .save__* */
+.share__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+}
+
+.share__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 45%) 0%, rgb(0 0 0 / 55%) 100%);
+}
+
+.share__pop {
+  position: relative;
+  width: min(330px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface) 98%, var(--accent) 2%) 0%,
+    var(--surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), 0 0 40px color-mix(in srgb, var(--accent) 6%, transparent);
+  padding: var(--sp-5);
+}
+
+.share__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  margin-bottom: var(--sp-3);
+}
+
+.share__title::before {
+  content: '';
+  width: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0.6;
+}
+
+.share__preview {
+  display: block;
+  width: 100%;
+  max-height: 54vh;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  margin-bottom: var(--sp-4);
+}
+
+.share__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.share__actions > * {
+  flex: 1 1 45%;
+  text-align: center;
+}
+
 /* ------------------------------------------------- toast de atualizacao */
 
 .update-toast {

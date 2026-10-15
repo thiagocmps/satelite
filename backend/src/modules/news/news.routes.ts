@@ -14,6 +14,10 @@ export function createNewsRoutes(
   router.get('/', validate({ query: listQuerySchema }), news.list);
   router.get('/:id', validate({ params: idParamsSchema }), news.get);
 
+  // Proxy da foto para o cartao de compartilhamento: mesma origem do app,
+  // senao o canvas contamina e o PNG nunca sai.
+  router.get('/:id/share-photo', validate({ params: idParamsSchema }), news.sharePhoto);
+
   // O resumo vive sob /news/:id/summary; as rotas ficam aqui para que o
   // controlador de resumos cuide apenas da logica de IA.
   router.get('/:id/summary', validate({ params: idParamsSchema }), summaries.get);

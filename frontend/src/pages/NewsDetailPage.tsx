@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SaveButton } from '../components/SaveButton';
+import { ShareButton } from '../components/ShareButton';
 import { SummaryPanel } from '../components/SummaryPanel';
 import { ErrorBox } from '../components/States';
 import { useArticle, useSavedIds, useUpdateNote } from '../hooks/useSatelite';
@@ -138,6 +139,7 @@ export function NewsDetailPage() {
             <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">
               Ler a notícia original em {hostFromUrl(data.url)} ↗
             </a>
+            <ShareButton article={data} />
             <SaveButton articleId={data.id} />
           </p>
         </article>

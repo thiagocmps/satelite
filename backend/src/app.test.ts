@@ -105,6 +105,75 @@ describe('GET /api/v1/news/:id', () => {
   });
 });
 
+describe('GET /api/v1/news/:id/share-photo', () => {
+  const ID = '22222222-2222-4222-8222-222222222222';
+  const realFetch = globalThis.fetch;
+  const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    container.newsRepository.findById = async () => null;
+  });
+
+  const withPhoto = (imageUrl: string | null) => {
+    container.newsRepository.findById = async () => ({ id: ID, imageUrl }) as never;
+  };
+
+  it('404 quando a noticia nao existe', async () => {
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('404 quando a noticia nao tem foto', async () => {
+    withPhoto(null);
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+    expect(response.status).toBe(404);
+  });
+
+  it('404 quando a URL da foto nao e http(s)', async () => {
+    withPhoto('file:///etc/passwd');
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+    expect(response.status).toBe(404);
+  });
+
+  it('devolve os bytes com content-type e cache', async () => {
+    withPhoto('https://cdn.exemplo.com/foto.jpg');
+    globalThis.fetch = async () =>
+      new Response(jpegBytes, { status: 200, headers: { 'content-type': 'image/jpeg; charset=binary' } });
+
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('image/jpeg');
+    expect(response.headers['cache-control']).toBe('public, max-age=86400');
+    expect(Buffer.isBuffer(response.body)).toBe(true);
+    expect(response.body.equals(jpegBytes)).toBe(true);
+  });
+
+  it('404 quando o CDN responde com erro — nunca 500', async () => {
+    withPhoto('https://cdn.exemplo.com/foto.jpg');
+    globalThis.fetch = async () => new Response('sumiu', { status: 404 });
+
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+    expect(response.status).toBe(404);
+  });
+
+  it('404 quando o 200 do CDN nao e uma imagem', async () => {
+    withPhoto('https://cdn.exemplo.com/foto.jpg');
+    globalThis.fetch = async () =>
+      new Response('<html>bloqueado</html>', { status: 200, headers: { 'content-type': 'text/html' } });
+
+    const response = await request(app).get(`/api/v1/news/${ID}/share-photo`);
+    expect(response.status).toBe(404);
+  });
+
+  it('400 para id invalido', async () => {
+    const response = await request(app).get('/api/v1/news/abc/share-photo');
+    expect(response.status).toBe(400);
+  });
+});
+
 describe('POST /api/v1/news/:id/summary', () => {
   it('404 quando a noticia nao existe', async () => {
     const response = await request(app).post('/api/v1/news/11111111-1111-4111-8111-111111111111/summary');

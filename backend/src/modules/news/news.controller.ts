@@ -27,5 +27,18 @@ export function createNewsController(news: NewsService) {
       const { id } = valid<{ id: string }>(req, 'params');
       res.json({ data: await news.get(id) });
     },
+
+    /**
+     * Foto da noticia em bytes, same-origin (o canvas do cartao de share
+     * precisa de uma imagem que nao contamine). Cache de 1 dia: a foto de
+     * uma noticia raramente muda.
+     */
+    sharePhoto: async (req: Request, res: Response) => {
+      const { id } = valid<{ id: string }>(req, 'params');
+      const photo = await news.getPhoto(id);
+      res.setHeader('content-type', photo.contentType);
+      res.setHeader('cache-control', 'public, max-age=86400');
+      res.send(photo.buffer);
+    },
   };
 }

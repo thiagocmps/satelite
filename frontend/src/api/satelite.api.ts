@@ -33,6 +33,14 @@ export function fetchSummary(id: string): Promise<{ data: AiSummaryPayload | nul
   return api.get<{ data: AiSummaryPayload | null }>(`/news/${id}/summary`);
 }
 
+/**
+ * URL da foto de compartilhamento (proxy same-origin): a foto remota contaminaria
+ * o canvas do cartao e o PNG nunca sairia.
+ */
+export function sharePhotoUrl(id: string): string {
+  return `/api/v1/news/${id}/share-photo`;
+}
+
 export function generateSummary(id: string): Promise<{ data: AiSummaryPayload }> {
   return api.post<{ data: AiSummaryPayload }>(`/news/${id}/summary`);
 }
