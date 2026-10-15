@@ -12,7 +12,13 @@ import { ValidationError } from '../../core/errors.js';
  * E aceita o proprio export em JSON (backup fiel): notas multilinha com
  * formatacao sobrevivem sem passar pelo Markdown.
  */
-export type ParsedCollectionItem = { title: string; url: string; note?: string };
+export type ParsedCollectionItem = {
+  title: string;
+  url: string;
+  note?: string;
+  /** Data original do salvamento (so o backup JSON traz; o Markdown nao). */
+  savedAt?: string;
+};
 export type ParsedCollection = { name: string; items: ParsedCollectionItem[] };
 
 /** `# Nome` (um nivel so: `##` e titulo de noticia, nao da colecao). */
@@ -163,6 +169,8 @@ const jsonCollectionSchema = z.object({
           title: z.string().optional(),
           url: z.url(),
           note: z.string().max(2000).nullable().optional(),
+          /** Backup fiel: quando presente, restaura a data original do salvamento. */
+          savedAt: z.string().datetime({ offset: true }).nullable().optional(),
         }),
       )
       .min(1),
@@ -200,6 +208,7 @@ export function parseCollectionJson(raw: string): ParsedCollection {
     seen.add(article.url);
     const item: ParsedCollectionItem = { title: article.title?.trim() || article.url, url: article.url };
     if (article.note?.trim()) item.note = article.note;
+    if (article.savedAt) item.savedAt = article.savedAt;
     items.push(item);
   }
 

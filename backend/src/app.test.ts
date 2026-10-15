@@ -580,6 +580,73 @@ conferir a resolução
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('JSON preserva a data de salvamento (savedAt) no saveMany', async () => {
+    const group = {
+      id: '77777777-7777-7777-8777-777777777777',
+      name: 'Missão Lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    const savedAt = '2026-09-28T10:05:00.000Z';
+    let received: Array<{ articleId: string; savedAt?: string | null }> = [];
+    container.savedRepository.findGroupByName = async () => group as never;
+    container.savedRepository.findArticleIdsByUrls = async () =>
+      new Map([['https://exemplo.com/sonda', 'a-1']]);
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async (
+      _groupId: string,
+      entries: Array<{ articleId: string; savedAt?: string | null }>,
+    ) => {
+      received = entries;
+      return entries.length;
+    };
+
+    const jsonBackup = JSON.stringify({
+      data: {
+        group: { name: 'Missão Lunar' },
+        articles: [{ url: 'https://exemplo.com/sonda', savedAt }],
+      },
+    });
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/json')
+      .send(jsonBackup);
+
+    expect(response.status).toBe(201);
+    expect(received).toEqual([{ articleId: 'a-1', savedAt }]);
+  });
+});
+
+describe('GET /api/v1/groups/:id/export?format=json', () => {
+  it('o backup inclui savedAt de cada noticia', async () => {
+    const groupId = '88888888-8888-4888-8888-888888888888';
+    container.savedRepository.findGroupById = async () =>
+      ({
+        id: groupId,
+        name: 'Missão Lunar',
+        color: null,
+        savedCount: 1,
+        createdAt: new Date(),
+      }) as never;
+    container.savedRepository.listGroupArticlesForExport = async () =>
+      [
+        {
+          id: 'a-1',
+          title: 'Sonda',
+          url: 'https://exemplo.com/sonda',
+          savedAt: '2026-09-28T10:05:00.000Z',
+        },
+      ] as never;
+
+    const response = await request(app).get(`/api/v1/groups/${groupId}/export?format=json`);
+    const payload = response.body as { data: { articles: Array<{ savedAt: string }> } };
+
+    expect(response.status).toBe(200);
+    expect(payload.data.articles[0]?.savedAt).toBe('2026-09-28T10:05:00.000Z');
+  });
 });
 
 describe('PUT /api/v1/saved/articles/:articleId/note', () => {

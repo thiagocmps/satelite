@@ -18,6 +18,12 @@ export type GroupPatch = Partial<GroupInput>;
 
 export type SavedListQuery = { page: number; limit: number; q?: string };
 
+/** Vinculo a criar; `savedAt` preserva a data original (so vem no backup JSON). */
+export type SaveEntry = { articleId: string; savedAt?: string | null };
+
+/** Artigo de colecao: o Article com a data em que foi salvo (contexto de export). */
+export type SavedArticle = Article & { savedAt: string };
+
 export interface SavedRepository {
   listGroups(): Promise<NewsGroup[]>;
   findGroupById(id: string): Promise<NewsGroup | null>;
@@ -32,12 +38,17 @@ export interface SavedRepository {
   findArticleIdsByUrls(urls: string[]): Promise<Map<string, string>>;
   /** Quais desses artigos ja estao na colecao (para reportar "ja estavam"). */
   listSavedArticleIds(groupId: string, articleIds: string[]): Promise<Set<string>>;
-  /** Vincula em massa; devolve quantos vinculos novos foram criados. */
-  saveMany(groupId: string, articleIds: string[]): Promise<number>;
+  /**
+   * Vincula em massa; devolve quantos vinculos novos foram criados. `savedAt`
+   * (opcional) fixa a data de salvamento original — vem do backup JSON; sem
+   * ele o banco usa now(). So afeta vinculos NOVOS: um vinculo ja existente
+   * mantem a sua data (reimportar nao reseta o salvamento).
+   */
+  saveMany(groupId: string, entries: SaveEntry[]): Promise<number>;
   unsave(groupId: string, articleId: string): Promise<void>;
   listGroupArticles(groupId: string, query: SavedListQuery): Promise<Paginated<Article>>;
-  /** Todos os artigos do grupo, sem paginação — só para o export (limitado). */
-  listGroupArticlesForExport(groupId: string, limit: number): Promise<Article[]>;
+  /** Todos os artigos do grupo (com savedAt) — para o export (limitado). */
+  listGroupArticlesForExport(groupId: string, limit: number): Promise<SavedArticle[]>;
   /** Todas as noticias salvas, em qualquer grupo, sem repeticao. */
   listSaved(query: SavedListQuery): Promise<Paginated<Article>>;
   /** { articleId: [groupId] } — marca os cards sem tocar na consulta quente de /news. */
@@ -182,13 +193,18 @@ export class PgSavedRepository implements SavedRepository {
     return new Set(rows.map((row) => row.article_id));
   }
 
-  async saveMany(groupId: string, articleIds: string[]): Promise<number> {
-    if (articleIds.length === 0) return 0;
+  async saveMany(groupId: string, entries: SaveEntry[]): Promise<number> {
+    if (entries.length === 0) return 0;
     const result = await this.db.query(
-      `insert into saved_articles (group_id, article_id)
-       select $1, unnest($2::uuid[])
+      `insert into saved_articles (group_id, article_id, saved_at)
+       select $1, e.article_id, coalesce(e.saved_at, now())
+         from unnest($2::uuid[], $3::timestamptz[]) as e(article_id, saved_at)
        on conflict do nothing`,
-      [groupId, articleIds],
+      [
+        groupId,
+        entries.map((entry) => entry.articleId),
+        entries.map((entry) => entry.savedAt ?? null),
+      ],
     );
     return result.rowCount ?? 0;
   }
@@ -219,17 +235,26 @@ export class PgSavedRepository implements SavedRepository {
     return paginate(ARTICLE_ROWS(page.rows), total, query);
   }
 
-  /** Export: todos os artigos do grupo em ordem de salvamento, sem paginação. */
-  async listGroupArticlesForExport(groupId: string, limit: number): Promise<Article[]> {
+  /** Export: todos os artigos do grupo (em ordem de salvamento) com savedAt. */
+  async listGroupArticlesForExport(groupId: string, limit: number): Promise<SavedArticle[]> {
+    // SELECT_ARTICLE_CARD comeca com o literal "select"; troco so esse prefixo
+    // para incluir sa.saved_at — o alias "sa" vem do join logo abaixo, e o SQL
+    // resolve os aliases do FROM contra o select, independentemente da ordem
+    // textual. Guardo a posicao apos o "select" inicial (o lateral traz outro
+    // "select *" mais adiante, que nao quero atingir).
+    const select = `select sa.saved_at as saved_at,${SELECT_ARTICLE_CARD.slice('select'.length)}`;
     const { rows } = await this.db.query(
-      `${SELECT_ARTICLE_CARD}
+      `${select}
        join saved_articles sa on sa.article_id = a.id
        where sa.group_id = $1
        order by sa.saved_at desc
        limit $2`,
       [groupId, limit],
     );
-    return ARTICLE_ROWS(rows);
+    return (rows as GroupRow[]).map((row) => ({
+      ...toArticle(row),
+      savedAt: (row.saved_at as Date).toISOString(),
+    }));
   }
 
   async listSaved(query: SavedListQuery): Promise<Paginated<Article>> {

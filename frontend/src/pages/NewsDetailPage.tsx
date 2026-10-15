@@ -134,6 +134,22 @@ export function NewsDetailPage() {
             <p className="muted small">A fonte não disponibilizou o texto completo; resuma pelo link original.</p>
           )}
 
+          <p className="row" style={{ marginTop: 'var(--sp-5)' }}>
+            <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">
+              Ler a notícia original em {hostFromUrl(data.url)} ↗
+            </a>
+            <SaveButton articleId={data.id} />
+          </p>
+        </article>
+
+        <aside className="detail__aside">
+          <SummaryPanel articleId={data.id} />
+
+          {/*
+            A nota mora na coluna do resumo (aside sticky): assim ela fica
+            visivel enquanto o leitor percorre a materia inteira, nao so no
+            fim do texto.
+          */}
           {isSaved ? (
             <section className="note-panel" aria-label="Anotação pessoal">
               <p className="note-panel__head">
@@ -161,7 +177,9 @@ export function NewsDetailPage() {
                 onChange={(event) => queueNoteSave(event.target.value)}
               />
               <p className="note-panel__foot">
-                <span className="faint small">{noteDraft.length > 1800 ? `${noteDraft.length}/${NOTE_MAX_CHARS}` : 'salva automaticamente'}</span>
+                <span className="faint small">
+                  {noteDraft.length > 1800 ? `${noteDraft.length}/${NOTE_MAX_CHARS}` : 'salva automaticamente'}
+                </span>
                 {noteDraft.trim() ? (
                   <button
                     type="button"
@@ -174,17 +192,6 @@ export function NewsDetailPage() {
               </p>
             </section>
           ) : null}
-
-          <p className="row" style={{ marginTop: 'var(--sp-5)' }}>
-            <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">
-              Ler a notícia original em {hostFromUrl(data.url)} ↗
-            </a>
-            <SaveButton articleId={data.id} />
-          </p>
-        </article>
-
-        <aside className="detail__aside">
-          <SummaryPanel articleId={data.id} />
         </aside>
       </div>
     </>

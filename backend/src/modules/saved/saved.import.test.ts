@@ -265,6 +265,41 @@ describe('parseCollectionJson', () => {
     expect(parsed.items.map((item) => item.note)).toEqual([undefined, undefined]);
   });
 
+  it('preserva a data de salvamento (savedAt) quando presente', () => {
+    const savedAt = '2026-09-28T10:05:00.000Z';
+    const parsed = parseCollectionJson(
+      JSON.stringify({
+        data: { group: { name: 'Colecao' }, articles: [{ url: 'https://exemplo.com/1', savedAt }] },
+      }),
+    );
+    expect(parsed.items[0]!.savedAt).toBe(savedAt);
+  });
+
+  it('savedAt ausente ou nulo fica sem data (banco usa now())', () => {
+    const parsed = parseCollectionJson(
+      JSON.stringify({
+        data: {
+          group: { name: 'Colecao' },
+          articles: [
+            { url: 'https://exemplo.com/1' },
+            { url: 'https://exemplo.com/2', savedAt: null },
+          ],
+        },
+      }),
+    );
+    expect(parsed.items.map((item) => item.savedAt)).toEqual([undefined, undefined]);
+  });
+
+  it('recusa savedAt que nao e data ISO', () => {
+    expect(() =>
+      parseCollectionJson(
+        JSON.stringify({
+          data: { group: { name: 'Colecao' }, articles: [{ url: 'https://exemplo.com/1', savedAt: 'ontem' }] },
+        }),
+      ),
+    ).toThrow(ValidationError);
+  });
+
   it('URL repetida conta uma vez (mesma regra do Markdown)', () => {
     const parsed = parseCollectionJson(
       JSON.stringify({

@@ -158,14 +158,17 @@ export class SavedService {
     const group = await this.#findOrCreateGroup(name);
 
     const found = await this.deps.repository.findArticleIdsByUrls(items.map((item) => item.url));
-    const ids = items.flatMap((item) => {
-      const id = found.get(item.url);
-      return id ? [id] : [];
+    const entries = items.flatMap((item) => {
+      const articleId = found.get(item.url);
+      return articleId ? [{ articleId, savedAt: item.savedAt }] : [];
     });
-    const alreadyIds = await this.deps.repository.listSavedArticleIds(group.id, ids);
+    const alreadyIds = await this.deps.repository.listSavedArticleIds(
+      group.id,
+      entries.map((entry) => entry.articleId),
+    );
     const added = await this.deps.repository.saveMany(
       group.id,
-      ids.filter((id) => !alreadyIds.has(id)),
+      entries.filter((entry) => !alreadyIds.has(entry.articleId)),
     );
 
     const notesApplied = await this.#applyNotes(items, found);
@@ -175,7 +178,7 @@ export class SavedService {
       group,
       total: items.length,
       added,
-      already: ids.length - added,
+      already: entries.length - added,
       notFound: missing.length,
       missingTitles: missing.slice(0, IMPORT_MISSING_SAMPLE).map((item) => item.title),
       notesApplied,
