@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { CollectionImportReport } from '../api/types';
-import { exportGroupUrl } from '../api/satelite.api';
+import { exportAllUrl, exportGroupUrl } from '../api/satelite.api';
 import { NewsCard } from '../components/NewsCard';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
@@ -177,6 +177,17 @@ export function SavedPage() {
               '⇧ Importar .md/.json'
             )}
           </button>
+          {list.length > 0 ? (
+            <a
+              className="button collection-create__import"
+              href={exportAllUrl()}
+              download
+              title="Baixar todas as coleções em Markdown (uma por arquivo) num .zip"
+              aria-label="Baixar todas as coleções em ZIP"
+            >
+              ⇩ Todas (.zip)
+            </a>
+          ) : null}
         </form>
 
         {importResult ? (

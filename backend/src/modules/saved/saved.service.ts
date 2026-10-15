@@ -1,3 +1,4 @@
+import AdmZip from 'adm-zip';
 import { slugify } from '../../core/slug.js';
 import type { Logger } from '../../config/logger.js';
 import { ConflictError, ExternalServiceError, NotFoundError } from '../../core/errors.js';
@@ -17,11 +18,14 @@ import type { GroupInput, GroupPatch, NewsGroup, SavedListQuery, SavedRepository
 const EXPORT_MAX_ARTICLES = 500;
 /** Titulos de notícias fora do banco: suficiente pra orientar, sem inflar a resposta. */
 const IMPORT_MISSING_SAMPLE = 10;
+/** Pasta raiz no ZIP: ao extrair, os .md nao se espalham na pasta do usuario. */
+const ZIP_ROOT_FOLDER = 'satelite-colecoes';
 
 /**
- * O import aceita os dois formatos que o export emite. Detecção pelo primeiro
- * caractere não-branco: JSON começa com `{`, Markdown começa com `#`.
- * (Também cobre `?format=` errado — o conteúdo manda, não o parâmetro.)
+ * O import aceita tudo que o export ja emitiu (e o que o usuario escrever):
+ * JSON comeca com `{`; Markdown comeca com `#` — e dentro dele, `###` detecta
+ * o formato unico atual, ausencia dele cai no legado `#`/`##`.
+ * (Tambem cobre `?format=` errado — o conteudo manda, nao o parametro.)
  */
 function parseCollection(raw: string): ParsedCollection {
   return raw.trimStart().startsWith('{') ? parseCollectionJson(raw) : parseCollectionMarkdown(raw);
@@ -141,6 +145,37 @@ export class SavedService {
       filename: `satelite-colecao-${slug}-${stamp}.md`,
       body: buildCollectionMarkdown(group, articles),
     };
+  }
+
+  /**
+   * ZIP com TODAS as colecoes: um `.md` por colecao (o mesmo formato do
+   * export unico) dentro de `satelite-colecoes/`. Colecao vazia vai com so
+   * o titulo — o arquivo e fiel ao que existe. Slug repetido ganha `-2`.
+   */
+  async exportAllCollectionsZip(): Promise<{ filename: string; buffer: Buffer }> {
+    const groups = await this.deps.repository.listGroups();
+    const perGroup = await Promise.all(
+      groups.map(async (group) => ({
+        group,
+        articles: await this.deps.repository.listGroupArticlesForExport(group.id, EXPORT_MAX_ARTICLES),
+      })),
+    );
+
+    const zip = new AdmZip();
+    const usedSlugs = new Map<string, number>();
+    for (const { group, articles } of perGroup) {
+      const base = slugify(group.name);
+      const occurrence = (usedSlugs.get(base) ?? 0) + 1;
+      usedSlugs.set(base, occurrence);
+      const filename = occurrence === 1 ? base : `${base}-${occurrence}`;
+      zip.addFile(
+        `${ZIP_ROOT_FOLDER}/${filename}.md`,
+        Buffer.from(buildCollectionMarkdown(group, articles), 'utf8'),
+      );
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    return { filename: `satelite-colecoes-${stamp}.zip`, buffer: zip.toBuffer() };
   }
 
   /**

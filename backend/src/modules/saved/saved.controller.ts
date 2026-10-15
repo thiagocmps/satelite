@@ -70,6 +70,16 @@ export function createSavedController(saved: SavedService) {
         .send(file.body);
     },
 
+    /** Download de TODAS as coleções num ZIP, um Markdown por coleção. */
+    exportAll: async (_req: Request, res: Response) => {
+      const file = await saved.exportAllCollectionsZip();
+      res
+        .status(200)
+        .setHeader('content-type', 'application/zip')
+        .setHeader('content-disposition', `attachment; filename="${file.filename}"`)
+        .send(file.buffer);
+    },
+
     suggest: async (req: Request, res: Response) => {
       const { articleId } = valid<{ articleId: string }>(req, 'body');
       res.json({ data: await saved.suggestGroup(articleId) });

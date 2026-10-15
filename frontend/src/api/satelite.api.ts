@@ -152,6 +152,14 @@ export function exportGroupUrl(id: string, format: 'markdown' | 'json' = 'markdo
   return `/api/v1/groups/${id}/export${buildQuery({ format })}`;
 }
 
+/**
+ * URL de download de TODAS as coleções num .zip (um .md por coleção).
+ * Igual ao export simples: link comum, o navegador baixa pelo content-disposition.
+ */
+export function exportAllUrl(): string {
+  return '/api/v1/groups/export-all';
+}
+
 export function saveArticleToGroup(groupId: string, articleId: string): Promise<void> {
   return api.put<void>(`/groups/${groupId}/articles/${articleId}`);
 }

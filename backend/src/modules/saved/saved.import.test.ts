@@ -139,6 +139,126 @@ Texto qualquer sem URL.
   });
 });
 
+describe('formato unico (H3) no import', () => {
+  it('le o export atual: nome em ##, noticia em ###, anotacao em paragrafo puro', () => {
+    const parsed = parseCollectionMarkdown(`
+## Eleições 2026
+
+### TSE define calendário eleitoral
+
+[exemplo.com ↗](https://exemplo.com/tse-calendario)
+
+Conferir se o TSE publicou a resolução.
+
+---
+
+### Outra matéria
+
+[folha.com.br ↗](https://folha.com.br/outra)
+`);
+
+    expect(parsed.name).toBe('Eleições 2026');
+    expect(parsed.items).toHaveLength(2);
+    expect(parsed.items[0]).toEqual({
+      title: 'TSE define calendário eleitoral',
+      url: 'https://exemplo.com/tse-calendario',
+      note: 'Conferir se o TSE publicou a resolução.',
+    });
+    expect(parsed.items[1]!.note).toBeUndefined();
+  });
+
+  it('paragrafos da anotacao preservam a estrutura (\\n no paragrafo, \\n\\n entre eles)', () => {
+    const parsed = parseCollectionMarkdown(`## Colecao
+
+### Materia
+
+[g1.globo.com ↗](https://g1.globo.com/x)
+
+Primeira linha do paragrafo.
+Segunda linha do mesmo paragrafo.
+
+Segundo paragrafo, isolado por linha em branco.`);
+
+    expect(parsed.items[0]!.note).toBe(
+      'Primeira linha do paragrafo.\nSegunda linha do mesmo paragrafo.\n\nSegundo paragrafo, isolado por linha em branco.',
+    );
+  });
+
+  it('URL depois do link da materia continua sendo texto da anotacao', () => {
+    const parsed = parseCollectionMarkdown(`## Colecao
+
+### Materia
+
+[exemplo.com ↗](https://exemplo.com/A-MATERIA)
+
+Ver também https://exemplo.com/OUTRA e [esse](https://exemplo.com/TERCEIRA).`);
+
+    expect(parsed.items[0]!.url).toBe('https://exemplo.com/A-MATERIA');
+    expect(parsed.items[0]!.note).toContain('https://exemplo.com/OUTRA');
+    expect(parsed.items[0]!.note).toContain('https://exemplo.com/TERCEIRA');
+  });
+
+  it('materia sem link e descartada; arquivo sem nenhuma valida e recusado', () => {
+    const parsed = parseCollectionMarkdown(`## Colecao
+
+### Sem endereco
+
+Texto qualquer sem URL.
+
+### Com endereco
+
+[exemplo.com ↗](https://exemplo.com/materia)`);
+    expect(parsed.items.map((item) => item.url)).toEqual(['https://exemplo.com/materia']);
+
+    expect(() => parseCollectionMarkdown('## Colecao\n\n### Sem endereco\n\nsem URL.')).toThrow(ValidationError);
+  });
+
+  it('URL repetida conta uma unica vez (mesma regra do legado)', () => {
+    const parsed = parseCollectionMarkdown(`## Colecao
+
+### Primeira
+
+[exemplo.com ↗](https://exemplo.com/1)
+
+### Segunda (mesmo endereco)
+
+[outro.com ↗](https://exemplo.com/1)`);
+
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]!.title).toBe('Primeira');
+  });
+});
+
+describe('buildCollectionMarkdown (formato unico)', () => {
+  it('escreve ## colecao, ### noticia, link com dominio e anotacao sem marcador', () => {
+    const markdown = buildCollectionMarkdown(group, [article({ note: 'minha nota' })]);
+
+    expect(markdown).toContain('## Eleições 2026');
+    expect(markdown).toContain('### TSE define calendário eleitoral');
+    expect(markdown).toContain('[exemplo.com ↗](https://exemplo.com/tse-calendario)');
+    expect(markdown).toContain('minha nota');
+    // paragrafo puro: sem marcador de anotacao, e so digitar uma linha abaixo
+    expect(markdown).not.toContain('**Anotação:**');
+    // documento de leitura, nao dump: descricao/resumo/fonte/data ficam de fora
+    expect(markdown).not.toContain('Divulgação das datas oficiais.');
+    expect(markdown).not.toContain('TSE divulgou o calendário.');
+    expect(markdown).not.toContain('G1 Globo');
+    expect(markdown).not.toContain('2 de outubro');
+    // filete separa as noticias, mas nao fecha o arquivo com separador solto
+    expect(markdown.trimEnd().endsWith('---')).toBe(false);
+  });
+
+  it('um unico filete entre duas noticias; colecao vazia e so o titulo', () => {
+    const markdown = buildCollectionMarkdown(group, [
+      article({ note: null }),
+      article({ id: 'a-2', url: 'https://exemplo.com/pec-escala' }),
+    ]);
+    expect(markdown.match(/^---$/gm)).toHaveLength(1);
+
+    expect(buildCollectionMarkdown(group, [])).toBe('## Eleições 2026\n');
+  });
+});
+
 describe('anotações no Markdown', () => {
   it('fecha o ciclo: nota do export volta igual (incluindo multilinha e escape)', () => {
     const articles = [

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import AdmZip from 'adm-zip';
 import type { Logger } from '../../config/logger.js';
 import { ExternalServiceError, NotFoundError } from '../../core/errors.js';
 import type { AiProvider } from '../../integrations/ai/ai.provider.js';
@@ -28,7 +29,13 @@ const article: Article = {
   note: null,
 };
 
-function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> = {}) {
+function setup(
+  overrides: Partial<{
+    suggestText: string;
+    groups: NewsGroup[];
+    articlesByGroup: Record<string, Article[]>;
+  }> = {},
+) {
   const saved: Array<[string, string]> = [];
   const created: Array<{ name: string }> = [];
   const notes = new Map<string, string | null>();
@@ -43,6 +50,7 @@ function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> 
       saved.push([groupId, articleId]);
     },
     listGroups: async () => overrides.groups ?? [group],
+    listGroupArticlesForExport: async (groupId: string) => overrides.articlesByGroup?.[groupId] ?? [],
     setNote: async (articleId: string, note: string | null) => {
       notes.set(articleId, note);
     },
@@ -143,6 +151,59 @@ describe('SavedService', () => {
     it('404 para noticia inexistente', async () => {
       const { service } = setup();
       await expect(service.setNote('a-x', 'nota')).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('export de todas as coleções (ZIP)', () => {
+    it('gera um .md por coleção em satelite-colecoes/, fiel ao conteúdo', async () => {
+      const vazia: NewsGroup = {
+        id: 'g-2',
+        name: 'Mobilidade Portugal',
+        color: null,
+        savedCount: 0,
+        createdAt: new Date(),
+      };
+      const { service } = setup({
+        groups: [group, vazia],
+        articlesByGroup: { 'g-1': [{ ...article, note: 'acompanhar' }] },
+      });
+
+      const file = await service.exportAllCollectionsZip();
+
+      expect(file.filename).toMatch(/^satelite-colecoes-\d{4}-\d{2}-\d{2}\.zip$/);
+
+      const zip = new AdmZip(file.buffer);
+      expect(zip.getEntries().map((entry) => entry.entryName)).toEqual([
+        'satelite-colecoes/eleicoes-2026.md',
+        'satelite-colecoes/mobilidade-portugal.md',
+      ]);
+
+      const md = zip.readAsText('satelite-colecoes/eleicoes-2026.md');
+      expect(md).toContain('## Eleicoes 2026');
+      expect(md).toContain('### Lula e Bolsonaro disputam o segundo turno');
+      expect(md).toContain('[exemplo.com ↗](https://exemplo.com/1)');
+      expect(md).toContain('acompanhar');
+
+      // coleção vazia: só o título — o arquivo é fiel ao que existe
+      expect(zip.readAsText('satelite-colecoes/mobilidade-portugal.md')).toBe('## Mobilidade Portugal\n');
+    });
+
+    it('nome repetido ganha sufixo -2, -3 (nenhum arquivo sobrescreve o outro)', async () => {
+      const clone: NewsGroup = { ...group, id: 'g-9' };
+      const { service } = setup({ groups: [group, clone, { ...clone, id: 'g-10' }] });
+
+      const file = await service.exportAllCollectionsZip();
+      const names = new AdmZip(file.buffer).getEntries().map((entry) => entry.entryName);
+
+      // ordem do ZIP nao importa: o que importa e nenhum arquivo sobrescrever o outro
+      expect(new Set(names)).toEqual(
+        new Set([
+          'satelite-colecoes/eleicoes-2026.md',
+          'satelite-colecoes/eleicoes-2026-2.md',
+          'satelite-colecoes/eleicoes-2026-3.md',
+        ]),
+      );
+      expect(names).toHaveLength(3);
     });
   });
 });

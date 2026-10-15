@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import request from 'supertest';
+import AdmZip from 'adm-zip';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import { createContainer } from './container.js';
@@ -385,12 +386,12 @@ describe('GET /api/v1/groups/:id/export', () => {
     expect(response.headers['content-disposition']).toContain(
       'attachment; filename="satelite-colecao-eleicoes-2026-',
     );
-    expect(response.text).toContain('# Eleições 2026');
-    expect(response.text).toContain('1 notícia · exportado de Satelite em');
-    expect(response.text).toContain('## 1. TSE define calendário eleitoral');
-    expect(response.text).toContain('[G1 Globo](https://g1.globo.com) · 2 de outubro de 2026 · Política');
-    expect(response.text).toContain('> TSE divulgou o calendário.');
-    expect(response.text).toContain('[Ler original](https://exemplo.com/tse-calendario)');
+    expect(response.text).toContain('## Eleições 2026');
+    expect(response.text).toContain('### TSE define calendário eleitoral');
+    expect(response.text).toContain('[exemplo.com ↗](https://exemplo.com/tse-calendario)');
+    // formato unico: sem descricao, sem resumo, sem fonte/data
+    expect(response.text).not.toContain('Divulgação das datas oficiais.');
+    expect(response.text).not.toContain('TSE divulgou o calendário.');
   });
 
   it('gera JSON quando pedido', async () => {
@@ -416,6 +417,74 @@ describe('GET /api/v1/groups/:id/export', () => {
     const response = await request(app).get(`/api/v1/groups/${groupId}/export?format=csv`);
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('GET /api/v1/groups/export-all', () => {
+  const makeGroup = (id: string, name: string) =>
+    ({ id, name, color: null, savedCount: 0, createdAt: new Date() }) as never;
+
+  /** Binário cru: o superagent não sabe ler `application/zip` sozinho. */
+  const getZip = (path: string) =>
+    request(app)
+      .get(path)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+  it('devolve ZIP com pasta raiz e um .md por colecao', async () => {
+    container.savedRepository.listGroups = async () =>
+      [makeGroup('g-1', 'Eleições 2026'), makeGroup('g-2', 'Mobilidade Portugal')] as never;
+    container.savedRepository.listGroupArticlesForExport = async (groupId: string) =>
+      (groupId === 'g-1'
+        ? [{ id: 'a-1', title: 'Sonda', url: 'https://exemplo.com/sonda', note: 'minha nota' }]
+        : []) as never;
+
+    const response = await getZip('/api/v1/groups/export-all');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/zip');
+    expect(response.headers['content-disposition']).toMatch(
+      /attachment; filename="satelite-colecoes-\d{4}-\d{2}-\d{2}\.zip"/,
+    );
+
+    const zip = new AdmZip(response.body);
+    expect(new Set(zip.getEntries().map((entry) => entry.entryName))).toEqual(
+      new Set(['satelite-colecoes/eleicoes-2026.md', 'satelite-colecoes/mobilidade-portugal.md']),
+    );
+
+    const md = zip.readAsText('satelite-colecoes/eleicoes-2026.md');
+    expect(md).toContain('## Eleições 2026');
+    expect(md).toContain('### Sonda');
+    expect(md).toContain('[exemplo.com ↗](https://exemplo.com/sonda)');
+    expect(md).toContain('minha nota');
+
+    // colecao vazia: so o titulo — o arquivo e fiel ao que existe
+    expect(zip.readAsText('satelite-colecoes/mobilidade-portugal.md')).toBe('## Mobilidade Portugal\n');
+  });
+
+  it('slug repetido ganha sufixo -2', async () => {
+    container.savedRepository.listGroups = async () =>
+      [makeGroup('g-1', 'Eleições 2026'), makeGroup('g-2', 'Eleições 2026!')] as never;
+
+    const response = await getZip('/api/v1/groups/export-all');
+    const names = new AdmZip(response.body).getEntries().map((entry) => entry.entryName);
+
+    expect(new Set(names)).toEqual(
+      new Set(['satelite-colecoes/eleicoes-2026.md', 'satelite-colecoes/eleicoes-2026-2.md']),
+    );
+    expect(names).toHaveLength(2);
+  });
+
+  it('nenhuma colecao ainda gera um ZIP valido (vazio)', async () => {
+    container.savedRepository.listGroups = async () => [] as never;
+
+    const response = await getZip('/api/v1/groups/export-all');
+
+    expect(response.status).toBe(200);
+    expect(new AdmZip(response.body).getEntries()).toHaveLength(0);
   });
 });
 

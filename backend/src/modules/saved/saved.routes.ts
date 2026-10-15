@@ -25,6 +25,8 @@ export function createSavedRoutes(
 
   router.get('/groups', controller.listGroups);
   router.post('/groups', validate({ body: createGroupSchema }), controller.createGroup);
+  // segmento proprio (sem :id): baixa TODAS as colecoes num ZIP
+  router.get('/groups/export-all', controller.exportAll);
   router.post('/groups/suggest', suggestLimiter, validate({ body: articleIdBodySchema }), controller.suggest);
   // corpo cru (Markdown ou JSON do arquivo, detectado pelo conteudo)
   router.post('/groups/import', text({ limit: '2mb', type: () => true }), controller.importGroup);

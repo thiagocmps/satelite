@@ -6,8 +6,11 @@ import { ValidationError } from '../../core/errors.js';
  * gera, para o ciclo fechar (exportar -> editar -> importar). Funcoes puras,
  * sem banco: a orquestracao com o repositorio fica em saved.service.ts.
  *
- * Tambem aceita um Markdown escrito a mao, desde que cada noticia seja um
- * bloco `## Titulo` e tenha um link (de preferencia `[Ler original](url)`).
+ * Dois formatos de Markdown:
+ * - FORMATO UNICO (atual): `## Colecao` + `### Titulo` por noticia, anotacao
+ *   em paragrafo puro depois do link. Detecao: linha H3.
+ * - LEGADO (export antigo e arquivo escrito a mao): `# Colecao` + `## Titulo`,
+ *   anotacao atras do marcador `**Anotação:**`, preferindo `[Ler original](url)`.
  *
  * E aceita o proprio export em JSON (backup fiel): notas multilinha com
  * formatacao sobrevivem sem passar pelo Markdown.
@@ -25,6 +28,10 @@ export type ParsedCollection = { name: string; items: ParsedCollectionItem[] };
 const H1 = /^#(?!#)\s+(.*)$/;
 /** `## 1. Titulo` — o export numera; o numero e opcional aqui. */
 const H2 = /^##(?!#)\s+(.*)$/;
+/** `### Titulo` — noticia do formato unico (`##` la e o nome da colecao). */
+const H3 = /^###(?!#)\s+(.*)$/;
+/** Filete entre noticias do formato unico. */
+const SEP_LINE = /^-{3,}$/;
 /** O rotulo que o export escreve antes da URL da noticia. */
 const LER_ORIGINAL = /\[Ler original\]\((.+)\)\s*$/i;
 /** O rotulo da anotacao que o export escreve; tolera a forma sem acento. */
@@ -110,6 +117,9 @@ export function parseCollectionMarkdown(markdown: string): ParsedCollection {
   const trimmed = markdown.trim();
   if (!trimmed) throw new ValidationError('O arquivo de importacao esta vazio');
 
+  // formato unico do export: noticias em H3 (o `##` la e o nome da colecao)
+  if (/^###(?!#)\s/m.test(trimmed)) return parseModernCollection(trimmed);
+
   let name = '';
   const items: ParsedCollectionItem[] = [];
   const seen = new Set<string>();
@@ -154,6 +164,87 @@ export function parseCollectionMarkdown(markdown: string): ParsedCollection {
   flush();
 
   return requireItems(name, items);
+}
+
+/**
+ * Formato unico do export: `## Colecao` + `### Noticia`; a primeira linha de
+ * link do bloco e a URL da materia, e TODO o resto do bloco (sem o filete)
+ * e anotacao em paragrafo puro. Paragrafos preservam a estrutura: linhas
+ * juntas no mesmo paragrafo voltam com `\n`, paragrafos com `\n\n` — ou seja,
+ * anotar e so digitar mais uma linha (ou paragrafo) abaixo.
+ */
+function parseModernCollection(trimmed: string): ParsedCollection {
+  let name = '';
+  const items: ParsedCollectionItem[] = [];
+  const seen = new Set<string>();
+  let heading: string | null = null;
+  let block: string[] = [];
+
+  const flush = () => {
+    if (heading === null) return;
+    const { url, note } = modernBlockOf(block);
+    // sem link nao ha como achar a noticia: item descartado; URL repetida
+    // tambem cai aqui — primeira ocorrencia vence
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      const item: ParsedCollectionItem = { title: heading || url, url };
+      if (note) item.note = note;
+      items.push(item);
+    }
+    heading = null;
+    block = [];
+  };
+
+  for (const line of trimmed.split(/\r?\n/)) {
+    const h3 = H3.exec(line);
+    if (h3) {
+      flush();
+      heading = titleOf(h3[1]!);
+      continue;
+    }
+
+    // `## Nome` so antes da primeira noticia e o nome da colecao; depois, ruido
+    const h2 = H2.exec(line);
+    if (h2) {
+      if (heading === null && !name) name = unescapeMd(h2[1]!.trim());
+      continue;
+    }
+
+    if (heading !== null) block.push(line);
+  }
+  flush();
+
+  return requireItems(name, items);
+}
+
+/** Bloco do formato unico: primeiro link = URL; o resto vira anotacao. */
+function modernBlockOf(lines: string[]): { url: string | null; note: string } {
+  let url: string | null = null;
+  const paragraphs: string[][] = [[]];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (SEP_LINE.test(trimmed)) continue;
+    if (!trimmed) {
+      if (paragraphs[paragraphs.length - 1]!.length > 0) paragraphs.push([]);
+      continue;
+    }
+    if (url === null && !trimmed.startsWith('>')) {
+      const link = MD_LINK_TARGET.exec(trimmed);
+      if (link) {
+        url = link[1]!;
+        continue;
+      }
+    }
+    paragraphs[paragraphs.length - 1]!.push(line);
+  }
+
+  const note = paragraphs
+    .map((paragraph) => paragraph.join('\n'))
+    .filter((paragraph) => paragraph.trim() !== '')
+    .join('\n\n')
+    .trim();
+  return { url, note };
 }
 
 /** Formato do export em JSON (`{ data: { group, articles } }`). */
