@@ -7,6 +7,7 @@ const links = [
   { to: '/salvos', label: 'Coleções', end: false },
   { to: '/categorias', label: 'Categorias', end: false },
   { to: '/fontes', label: 'Fontes', end: false },
+  { to: '/config-ia', label: 'IA', end: false },
 ];
 
 export function Layout() {

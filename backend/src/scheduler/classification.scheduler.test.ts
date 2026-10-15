@@ -30,15 +30,21 @@ const emptyReport: ClassificationReport = {
 type RunOnce = () => Promise<ClassificationReport>;
 
 function makeContainer(
-  overrides: Partial<{ env: Record<string, unknown>; isRunning: boolean; runOnce: RunOnce }> = {},
+  overrides: Partial<{
+    classify: Record<string, unknown>;
+    scheduler: Record<string, unknown>;
+    isRunning: boolean;
+    runOnce: RunOnce;
+  }> = {},
 ) {
   const runOnce = vi.fn<RunOnce>(overrides.runOnce ?? (async () => ({ ...emptyReport, processed: 3, aiCalls: 1 })));
   const container = {
-    env: {
-      AI_CLASSIFY_ENABLED: true,
-      ENABLE_CLASSIFY_SCHEDULER: true,
-      CLASSIFY_CRON: '*/10 * * * *',
-      ...overrides.env,
+    // o agendador le a config EM RUNTIME: gates e cron vem do settings.ai()
+    settings: {
+      ai: () => ({
+        classify: { enabled: true, ...overrides.classify },
+        scheduler: { classifyEnabled: true, classifyCron: '*/10 * * * *', ...overrides.scheduler },
+      }),
     },
     classification: { isRunning: overrides.isRunning ?? false, runOnce },
   };
@@ -63,7 +69,7 @@ afterEach(() => {
 });
 
 describe('startClassificationScheduler', () => {
-  it('agenda no CLASSIFY_CRON e roda runOnce a cada tick', async () => {
+  it('agenda no cron da config e roda runOnce a cada tick', async () => {
     const { container, logger, runOnce } = makeContainer();
 
     startClassificationScheduler(container, logger);
@@ -112,23 +118,23 @@ describe('startClassificationScheduler', () => {
     expect(logger.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'ciclo de classificacao falhou');
   });
 
-  it('ENABLE_CLASSIFY_SCHEDULER=false nao agenda nada', () => {
-    const { container, logger } = makeContainer({ env: { ENABLE_CLASSIFY_SCHEDULER: false } });
+  it('agendador desligado na config (scheduler.classifyEnabled=false) nao agenda', () => {
+    const { container, logger } = makeContainer({ scheduler: { classifyEnabled: false } });
 
     expect(startClassificationScheduler(container, logger)).toBeNull();
     expect(scheduleMock).not.toHaveBeenCalled();
   });
 
-  it('AI_CLASSIFY_ENABLED=false tambem desliga o agendador', () => {
-    const { container, logger } = makeContainer({ env: { AI_CLASSIFY_ENABLED: false } });
+  it('classificacao por IA desligada na config (classify.enabled=false) tambem desliga', () => {
+    const { container, logger } = makeContainer({ classify: { enabled: false } });
 
     expect(startClassificationScheduler(container, logger)).toBeNull();
     expect(scheduleMock).not.toHaveBeenCalled();
   });
 
-  it('recusa expressao cron invalida', () => {
+  it('recusa expressao cron invalida vinda da config', () => {
     validateMock.mockReturnValue(false);
-    const { container, logger } = makeContainer({ env: { CLASSIFY_CRON: 'vadia' } });
+    const { container, logger } = makeContainer({ scheduler: { classifyCron: 'vadia' } });
 
     expect(() => startClassificationScheduler(container, logger)).toThrow(/CLASSIFY_CRON invalido/);
   });

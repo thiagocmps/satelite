@@ -262,14 +262,16 @@ cd backend && npx vitest run -t "dedup"          # por nome
 | `integrations/ai/opencode.provider.test.ts`          | endpoint/chave do Zen, JSON estrito, fallback de modelo  |
 | `integrations/ai/composite.provider.test.ts`         | cadeia: failover em cota/429/5xx/timeout; sem troca em credencial; relança o último erro |
 | `integrations/ai/ai.registry.test.ts`                | montagem da cadeia, validação das chaves (OpenRouter/Groq) no fallback |
+| `integrations/ai/ai.hub.test.ts`                     | provedor mutável: reconstrói por versão da config; `classifyBatch` espelhado |
 | `integrations/ai/ai.classify.test.ts`                | prompt do catalogo, parsing e allowlist de slugs         |
-| `scheduler/classification.scheduler.test.ts`         | agendador: tick, fila em andamento, enables, cron invalido |
+| `scheduler/classification.scheduler.test.ts`         | agendador: tick, fila em andamento, enables da config, cron invalido |
 | `modules/classification/keyword-engine.test.ts`      | regras, acento, borda de palavra, ambiguidade            |
 | `modules/classification/classification.service.test.ts` | fila: keyword sem custo, IA na duvida, falha pendente |
 | `modules/ingestion/ingestion.service.test.ts`        | dedup, contagens, fonte que falha não derruba as outras   |
+| `modules/settings/settings.service.test.ts`          | overlay do banco, máscara de chave, validação cruzada, appliers |
 | `modules/summaries/summaries.service.test.ts`        | cache, `input_hash`, chamada concorrente                 |
 | `modules/sources/sources.repository.test.ts`         | violação de unique → 409                                 |
-| `app.test.ts`                                        | rotas com `supertest`, validação, envelope de erro       |
+| `app.test.ts`                                        | rotas com `supertest`, validação, envelope de erro (inclusive GET/PATCH `/settings/ai`) |
 
 Padrão para dublês: interface do repositório + classe em memória que guarda o estado
 (veja `summaries.service.test.ts`). Para rotas, o `supertest` roda o app de verdade com o
@@ -281,8 +283,10 @@ Padrão para dublês: interface do repositório + classe em memória que guarda 
 | -------------------------------------- | -------------------------------------------------------------- |
 | Adicionar campo na notícia             | migration + `news.types.ts` + `SELECT_ARTICLE` + `frontend/src/api/types.ts` |
 | Novo filtro na listagem                | `news.schemas.ts` + `buildFilters` + `Filters.tsx`              |
-| Novo provedor de IA                    | `openai-compatible.provider.ts` (base) + subclasse + `ai.registry.ts` (+ env se precisar de vars próprias) |
-| Encadear fallback entre provedores     | `AI_FALLBACK_PROVIDERS` no `.env` (nomes registrados no registry) |
+| Novo provedor de IA                    | `ai.registry.ts` (meta + builders; cards da tela aparecem sozinhos) + `settings.defaults.ts` + vars no `env.ts` + subclasse se o payload diferir |
+| Encadear fallback entre provedores     | `AI_FALLBACK_PROVIDERS` no `.env` ou na tela `/config-ia` (nomes registrados no registry) |
+| Novo knob editável na tela de IA       | `settings.schema.ts` (validação) + `settings.describe.ts` (descritor) + leitura no service que consome — o frontend renderiza pelo descritor |
+| Trocar modelo/chave sem tocar no .env  | tela `/config-ia` (ou `PATCH /api/v1/settings/ai`); persiste em `app_settings` e aplica em runtime |
 | Novo passo na ingestão                 | `ingestion.service.ts` (e o `NormalizedArticle`, se o dado for novo) |
 | Nova rota                              | `*.routes.ts` + `*.controller.ts` + `routes/index.ts`            |
 | Novo tema/cor                          | `styles/tokens.css`                                             |

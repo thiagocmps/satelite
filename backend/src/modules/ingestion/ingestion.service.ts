@@ -6,6 +6,7 @@ import type { NormalizedArticle } from '../news/news.types.js';
 import { buildArticleText, buildKeywordIndex, buildKeywordText, classifyText, type KeywordIndex } from '../classification/keyword-engine.js';
 import { isSportsContent } from '../classification/sports-block.js';
 import type { NewsRepository } from '../news/news.repository.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import type { SourcesRepository } from '../sources/sources.repository.js';
 import type { SourceRecord } from '../sources/sources.types.js';
 import type { IngestionRunsRepository } from './ingestion.repository.js';
@@ -42,10 +43,11 @@ export type IngestionDeps = {
   listRules: () => Promise<{ categoryId: string; keyword: string }[]>;
   logger: Logger;
   concurrency: number;
-  /** Fila de classificacao por IA ligada (AI_CLASSIFY_ENABLED). */
-  aiClassifyEnabled: boolean;
-  /** Tamanho minimo de texto para a IA entrar na duvida. */
-  minClassifyTextChars: number;
+  /**
+   * Ajustes de IA lidos POR ARTIGO na hora de decidir se entra na fila
+   * (classify.enabled e classify.minTextChars) — vale sem reiniciar.
+   */
+  settings: AiSettingsSource;
   /** Dropa conteudo esportivo na ingestao (CONTENT_FILTER_SPORTS). */
   blockSports: boolean;
   /** Id da categoria 'politica' (protege noticia de politica que cita esporte). */
@@ -155,6 +157,7 @@ export class IngestionService {
       // regras da Copa) e mantida — o leitor quer politica, nao esporte.
       let filteredSports = 0;
       const politicaCategoryId = await this.deps.politicaCategoryId();
+      const classifyCfg = this.deps.settings.ai().classify;
       const normalized: NormalizedArticle[] = [];
       for (const { article, keywordText, result, fullText } of entries) {
         if (this.deps.blockSports && isSportsContent(keywordText)) {
@@ -170,9 +173,9 @@ export class IngestionService {
           ...article,
           categoryId: result.decision === 'decisive' ? result.match.categoryId : article.categoryId,
           needsAi:
-            this.deps.aiClassifyEnabled &&
+            classifyCfg.enabled &&
             result.decision !== 'decisive' &&
-            fullText.length >= this.deps.minClassifyTextChars,
+            fullText.length >= classifyCfg.minTextChars,
           categoryMethod: result.decision === 'decisive' ? ('keyword' as const) : null,
         });
       }

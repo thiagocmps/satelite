@@ -10,12 +10,29 @@ const env = loadEnv();
 const logger = createLogger(env);
 const pool = createPool(env, logger);
 const container = createContainer(env, logger, pool);
+
+// Overrides do banco (tela /config-ia) entram ANTES de agendar e de servir:
+// reload falho fica so no .env (o service ja trata sem derrubar o boot).
+await container.settings.reload();
+
 const app = createApp(container, logger);
 const scheduler = startIngestionScheduler(container, logger);
-const classificationScheduler = startClassificationScheduler(container, logger);
+let classificationScheduler = startClassificationScheduler(container, logger);
 
+// Salvar na tela de config repara o agendador na hora: para o cron antigo e
+// sobe o novo (presets do .env ou o que o usuario acabou de escolher).
+container.settings.onApply(async () => {
+  await classificationScheduler?.stop();
+  classificationScheduler = startClassificationScheduler(container, logger);
+  logger.info('agendador de classificacao recarregado apos mudanca de config');
+});
+
+const ai = container.settings.ai();
 const server = app.listen(env.PORT, env.HOST, () => {
-  logger.info({ port: env.PORT, host: env.HOST, aiModel: env.AI_MODEL }, `API no ar (${env.NODE_ENV})`);
+  logger.info(
+    { port: env.PORT, host: env.HOST, aiProvider: ai.provider, aiModel: ai.providers[ai.provider]?.model },
+    `API no ar (${env.NODE_ENV})`,
+  );
 });
 
 let shuttingDown = false;

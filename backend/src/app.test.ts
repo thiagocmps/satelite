@@ -872,3 +872,76 @@ describe('seguranca basica', () => {
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
 });
+
+describe('config em runtime (GET/PATCH /api/v1/settings/ai)', () => {
+  // container proprio por teste: o PATCH daqui em memoria nao vaza para os
+  // outros blocos deste arquivo
+  function settingsApp() {
+    const fresh = createContainer(env, logger, pool);
+    return { app: createApp(fresh, logger), container: fresh };
+  }
+
+  it('GET devolve a config efetiva com chaves mascaradas + descritores + provedores', async () => {
+    const { app } = settingsApp();
+
+    const response = await request(app).get('/api/v1/settings/ai');
+
+    expect(response.status).toBe(200);
+    const data = response.body.data;
+    expect(data.settings.provider).toBe('openrouter');
+    expect(data.settings.providers.openrouter.apiKey).toMatch(/^••••/);
+    expect(data.providers.map((provider: { id: string }) => provider.id)).toContain('groq');
+    expect(data.fields.some((field: { key: string }) => field.key === 'classify.batch')).toBe(true);
+    // a chave real (do .env do teste) nunca aparece na resposta
+    expect(JSON.stringify(response.body)).not.toContain('sk-or-teste');
+  });
+
+  it('PATCH aplica na hora no mesmo container (services leem sem reiniciar)', async () => {
+    const { app, container } = settingsApp();
+
+    const response = await request(app).patch('/api/v1/settings/ai').send({ classify: { batch: 42 } });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.settings.classify.batch).toBe(42);
+    expect(container.settings.ai().classify.batch).toBe(42);
+  });
+
+  it('PATCH troca o provedor e mascara a chave nova', async () => {
+    const { app, container } = settingsApp();
+
+    const response = await request(app)
+      .patch('/api/v1/settings/ai')
+      .send({ provider: 'groq', providers: { groq: { apiKey: 'gsk_nova_chave_abcd' } } });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.settings.provider).toBe('groq');
+    expect(response.body.data.settings.providers.groq.apiKey).toBe('••••abcd');
+    expect(container.settings.ai().provider).toBe('groq');
+  });
+
+  it('PATCH com cron invalido responde 400 VALIDATION_ERROR', async () => {
+    const { app } = settingsApp();
+
+    const response = await request(app).patch('/api/v1/settings/ai').send({ scheduler: { classifyCron: 'vadia' } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('PATCH com campo com typo e recusado (strict)', async () => {
+    const { app } = settingsApp();
+
+    const response = await request(app).patch('/api/v1/settings/ai').send({ classfy: { batch: 1 } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('PATCH trocando para provedor sem chave (nem .env nem banco) e 400', async () => {
+    const { app } = settingsApp();
+
+    const response = await request(app).patch('/api/v1/settings/ai').send({ provider: 'groq' });
+
+    expect(response.status).toBe(400);
+  });
+});

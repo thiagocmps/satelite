@@ -242,7 +242,35 @@ distribuição — nenhum dos quais é necessário enquanto a coleta é um `Prom
 feeds. Quando a escala exigir, o ponto de troca é `ingestion.service.ts`; o agendador vira apenas
 um cliente da fila.
 
-### 11. Migrations em SQL com runner próprio
+### 11. Configuração em runtime (tela `/config-ia`)
+
+O `.env` continua sendo o lugar dos **defaults** (e o fallback se o banco estiver vazio/inválido),
+mas o que a tela **IA** salva fica em `app_settings` (migration 010, `key → jsonb`) e sobrescreve o
+env sem reiniciar nada. O módulo `modules/settings/` é genérico: cada grupo (`ai`, por enquanto)
+tem defaults do env (`settings.defaults.ts`), schema zod com validação cruzada — provedor existe no
+registry, cadeia sem repetição, chave presente para quem será usado, cron de 5 campos — e
+**descritores de campo** servidos pela API. A UI renderiza a partir desses descritores: acrescentar
+um knob é 1 linha no schema + 1 no descritor, sem mexer no frontend. O `GET /settings/ai` nunca
+devolve chave em claro (máscara `••••` + sufixo), e `apiKey: ""` no PATCH significa "manter a
+atual" — assim a máscara pode viajar de ida e volta sem risco.
+
+Aplicação em runtime, em três pontos:
+
+- **Provider/modelo/chave** — os services guardam o `AiHub` (`integrations/ai/ai.hub.ts`), um
+  provider mutável que se reconstrói quando a *versão* da config muda. A troca vale na próxima
+  chamada, e a cache de resumo cai fora por construção (modelo novo = chave de cache nova).
+- **Tuning da classificação** — `ClassificationService`, `IngestionService` e `SummariesService`
+  leem `settings.ai()` a cada operação (lote, concorrência, cortes, piso de confiança) em vez de
+  valores congelados no construtor.
+- **Agendador** — `settings.onApply(...)` no `server.ts` para o cron antigo e sobe o novo: trocar a
+  cadência (ou ligar/desligar) na tela vale no próximo tick, com o mesmo `noOverlap`.
+
+**Alternativa descartada:** editar o `.env` de dentro do container. O compose interpola o env na
+subida e o backend não tem escrita no filesystem do host; além disso, estado que pertence ao
+banco deve viver no banco — `app_settings` sobrevive a `docker compose down/up` sem truque de
+volume.
+
+### 12. Migrations em SQL com runner próprio
 
 `db/migrations/*.sql`, aplicados em ordem alfabética, cada arquivo em uma transação, com checksum
 conferido e `pg_advisory_lock` para serializar instâncias. `migrate.js` roda como job único no
@@ -251,7 +279,7 @@ Compose e o backend só sobe depois que ele termina com sucesso (`service_comple
 **Alternativa descartada:** ORM com migrations. Um ORM custaria mais do que economiza: as
 consultas são pequenas, e SQL explícito deixa visível o uso dos índices.
 
-### 12. Tratamento de erro centralizado
+### 13. Tratamento de erro centralizado
 
 Hierarquia de `AppError` com `status` e `code` (`ValidationError`, `NotFoundError`, `ConflictError`,
 `ExternalServiceError`, `TimeoutError`). O `errorHandler` normaliza tudo em
@@ -259,7 +287,7 @@ Hierarquia de `AppError` com `status` e `code` (`ValidationError`, `NotFoundErro
 cliente. Violações de unique do Postgres são traduzidas para `409` no repositório em vez de virar
 `500`.
 
-### 13. Segurança
+### 14. Segurança
 
 - `helmet` na API (sem CSP: quem serve a UI é o nginx, e a API devolve JSON e imagens de terceiros),
   `crossOriginResourcePolicy: cross-origin` para o navegador aceitar as imagens das fontes, e headers
@@ -274,7 +302,7 @@ cliente. Violações de unique do Postgres são traduzidas para `409` no reposit
 - Resposta de feed com `content-length` acima de `FEED_MAX_BYTES` é recusada antes de ler o corpo —
   um feed que se declara gigante não vira consumo de banda nem de memória.
 
-### 14. Frontend com React Query
+### 15. Frontend com React Query
 
 Componentes não conhecem a API. A cadeia é: **página → hook (`useSatelite.ts`) → função de API →
 client HTTP**. O `QueryClient` centraliza `staleTime` (30s), política de retry (não repete erro 4xx) e

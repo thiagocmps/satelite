@@ -1,13 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import AdmZip from 'adm-zip';
+import { loadEnv } from '../../config/env.js';
 import type { Logger } from '../../config/logger.js';
 import { ExternalServiceError, NotFoundError } from '../../core/errors.js';
 import type { AiProvider } from '../../integrations/ai/ai.provider.js';
 import type { Article } from '../news/news.types.js';
+import { aiDefaults } from '../settings/settings.defaults.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import type { NewsGroup, SavedRepository } from './saved.repository.js';
 import { SavedService, type SavedDeps } from './saved.service.js';
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Logger;
+
+/** Config de IA falsa: defaults do .env (piso de confianca = 0.6, como em producao). */
+const settingsSource = (): AiSettingsSource => ({
+  ai: () =>
+    aiDefaults(
+      loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+    ),
+});
 
 const group: NewsGroup = { id: 'g-1', name: 'Eleicoes 2026', color: null, savedCount: 0, createdAt: new Date() };
 
@@ -77,7 +88,7 @@ function setup(
     }),
   } as unknown as AiProvider;
 
-  const service = new SavedService({ repository, news, provider, language: 'pt-BR', maxContentChars: 500, minConfidence: 0.6, logger } satisfies SavedDeps);
+  const service = new SavedService({ repository, news, provider, settings: settingsSource(), logger } satisfies SavedDeps);
 
   return { service, saved, created, notes };
 }

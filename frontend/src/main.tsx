@@ -6,6 +6,7 @@ import { ApiError } from './api/client';
 import { Layout } from './components/Layout';
 import { ErrorBox } from './components/States';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { AiSettingsPage } from './pages/AiSettingsPage';
 import { NewsDetailPage } from './pages/NewsDetailPage';
 import { NewsListPage } from './pages/NewsListPage';
 import { SavedPage } from './pages/SavedPage';
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'salvos', element: <SavedPage /> },
       { path: 'categorias', element: <CategoriesPage /> },
       { path: 'fontes', element: <SourcesPage /> },
+      { path: 'config-ia', element: <AiSettingsPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

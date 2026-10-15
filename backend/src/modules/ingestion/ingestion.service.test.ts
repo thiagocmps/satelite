@@ -1,11 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
+import { loadEnv } from '../../config/env.js';
 import { ConflictError, ExternalServiceError } from '../../core/errors.js';
 import type { Logger } from '../../config/logger.js';
 import type { FeedLoader, RawItem } from '../../integrations/rss/rss.types.js';
+import { aiDefaults } from '../settings/settings.defaults.js';
+import type { AiSettings, AiSettingsSource } from '../settings/settings.types.js';
 import { IngestionService, type IngestionDeps } from './ingestion.service.js';
 import type { SourceRecord } from '../sources/sources.types.js';
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Logger;
+
+/** Ajustes de IA falsos: defaults do .env com overrides pontuais por teste. */
+const settingsSource = (classify: Partial<AiSettings['classify']> = {}): AiSettingsSource => {
+  const base = aiDefaults(
+    loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+  );
+  return { ai: () => ({ ...base, classify: { ...base.classify, ...classify } }) };
+};
 
 const g1: SourceRecord = {
   id: 's-g1',
@@ -28,7 +39,8 @@ const bbc: SourceRecord = { ...g1, id: 's-bbc', slug: 'bbc', name: 'BBC', feedUr
 
 type FakeState = { inserted: string[]; finished: Array<Record<string, unknown>>; marked: Array<Record<string, unknown>> };
 
-function setup(overrides: Partial<IngestionDeps> = {}) {
+function setup(overrides: Partial<IngestionDeps> & { classify?: Partial<AiSettings['classify']> } = {}) {
+  const { classify = {}, ...rest } = overrides;
   const state: FakeState = { inserted: [], finished: [], marked: [] };
   const existing = new Set<string>();
 
@@ -70,11 +82,10 @@ function setup(overrides: Partial<IngestionDeps> = {}) {
     listRules: async () => [],
     logger,
     concurrency: 2,
-    aiClassifyEnabled: true,
-    minClassifyTextChars: 120,
+    settings: settingsSource({ enabled: true, minTextChars: 120, ...classify }),
     blockSports: false,
     politicaCategoryId: async () => null,
-    ...overrides,
+    ...rest,
   };
 
   return { service: new IngestionService(deps), state, existing };
@@ -190,7 +201,7 @@ describe('IngestionService.ingestSource', () => {
 
     const { service } = setup({
       listRules: async () => [{ categoryId: 'cat-politica', keyword: 'governo' }],
-      minClassifyTextChars: 1,
+      classify: { minTextChars: 1 },
       loadFeed: async () => ({
         notModified: false,
         status: 200,

@@ -197,3 +197,74 @@ export type NewsFilters = {
   limit?: number;
   sort?: 'recent' | 'relevance';
 };
+
+/* ---------------------------------------------- configuracao da IA (runtime) */
+
+export type ProviderSettings = {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  fallbackModels: string[];
+  classifyModel: string;
+  classifyFallbackModels: string[];
+};
+
+export type AiSettings = {
+  provider: string;
+  fallbackProviders: string[];
+  providers: Record<string, ProviderSettings>;
+  classify: {
+    enabled: boolean;
+    timeoutMs: number;
+    maxRetries: number;
+    batch: number;
+    batchSize: number;
+    concurrency: number;
+    minConfidence: number;
+    minTextChars: number;
+    maxContentChars: number;
+  };
+  summarize: { language: string; timeoutMs: number; maxRetries: number; maxContentChars: number };
+  scheduler: { classifyEnabled: boolean; classifyCron: string };
+};
+
+/** PATCH parcial: o backend mescla, valida e APPLICA em runtime. */
+export type AiSettingsPatch = {
+  provider?: string;
+  fallbackProviders?: string[];
+  providers?: Record<string, Partial<ProviderSettings>>;
+  classify?: Partial<AiSettings['classify']>;
+  summarize?: Partial<AiSettings['summarize']>;
+  scheduler?: Partial<AiSettings['scheduler']>;
+};
+
+/**
+ * Descritor vindo do backend: a tela renderiza por `type`/`section` sem
+ * conhecer a regra por tras — knob novo no backend aparece sozinho aqui.
+ */
+export type SettingsField = {
+  key: string;
+  section: 'provider' | 'providers' | 'classify' | 'scheduler' | 'summarize';
+  /** Section 'providers': a qual card o campo pertence. */
+  provider?: string;
+  type: 'password' | 'string' | 'number' | 'range' | 'boolean' | 'select' | 'multiselect' | 'cron' | 'csv';
+  label: string;
+  hint?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ value: string; label: string }>;
+  advanced?: boolean;
+  order: number;
+};
+
+export type AiProviderMeta = { id: string; label: string; keyUrl: string };
+
+/** GET/PATCH /settings/ai. Chave SEMPRE mascarada (•••• + sufixo). */
+export type AiSettingsView = {
+  settings: AiSettings;
+  defaults: AiSettings;
+  fields: SettingsField[];
+  providers: AiProviderMeta[];
+  version: number;
+};

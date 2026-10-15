@@ -3,6 +3,7 @@ import { ConflictError, ExternalServiceError } from '../../core/errors.js';
 import { parseClassifiedBatch, parseClassifiedContent, type ClassifyMention } from '../../integrations/ai/ai.classify.js';
 import type { AiProvider, AiSummaryResult, ClassifyInput } from '../../integrations/ai/ai.provider.js';
 import type { CategoriesRepository } from '../categories/categories.repository.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import type { ClassificationRepository, PendingArticle, ResolveVerdict } from './classification.repository.js';
 import { buildArticleText, buildKeywordIndex, buildKeywordText, classifyText, type KeywordIndex } from './keyword-engine.js';
 import { isSportsContent } from './sports-block.js';
@@ -29,19 +30,11 @@ export type ClassificationDeps = {
   categories: CategoriesRepository;
   listRules: () => Promise<{ categoryId: string; keyword: string }[]>;
   provider: AiProvider;
-  enabled: boolean;
-  language: string;
-  maxContentChars: number;
-  minTextChars: number;
-  minConfidence: number;
-  batchSize: number;
   /**
-   * Artigos por requisicao de IA. Corta o overhead fixo do prompt (catalogo,
-   * regras e exemplos) que hoje se repete por noticia: 25 artigos em lotes de
-   * 8 viram 4 requisicoes em vez de 25.
+   * Ajustes lidos A CADA RODADA (enabled, lote, concorrencia, cortes, piso de
+   * confianca): salvar na tela de config vale na proxima execucao, sem reiniciar.
    */
-  aiBatchSize: number;
-  concurrency: number;
+  settings: AiSettingsSource;
   /** Dropa conteudo esportivo antes de qualquer chamada de IA (CONTENT_FILTER_SPORTS). */
   blockSports: boolean;
   logger: Logger;
@@ -77,8 +70,9 @@ export class ClassificationService {
       pending: 0,
     };
 
-    if (!this.deps.enabled) {
-      this.deps.logger.info({}, 'classificacao por IA desligada (AI_CLASSIFY_ENABLED=false)');
+    const cfg = this.deps.settings.ai().classify;
+    if (!cfg.enabled) {
+      this.deps.logger.info({}, 'classificacao por IA desligada (config: classify.enabled=false)');
       return emptyReport;
     }
     if (this.#running) throw new ConflictError('Ja existe uma classificacao em andamento');
@@ -92,7 +86,7 @@ export class ClassificationService {
       const catalog = categories.map((category) => ({ slug: category.slug, name: category.name, id: category.id }));
       const idBySlug = new Map(catalog.map((category) => [category.slug, category.id]));
 
-      const pending = await this.deps.repository.listPending(this.deps.batchSize);
+      const pending = await this.deps.repository.listPending(cfg.batch);
 
       // Fase 1: tudo que a IA nao precisa ver sai da fila sem custo — keyword,
       // texto curto e esporte nao pagam requisicao nenhuma.
@@ -103,14 +97,14 @@ export class ClassificationService {
       }
 
       // Fase 2: o que sobrou vai para a IA em lotes. Uma requisicao cobre
-      // `aiBatchSize` artigos, entao o overhead fixo do prompt (catalogo +
+      // `cfg.batchSize` artigos, entao o overhead fixo do prompt (catalogo +
       // regras + exemplos) deixa de se repetir por noticia.
       const chunks: PendingArticle[][] = [];
-      for (let offset = 0; offset < forAi.length; offset += this.deps.aiBatchSize) {
-        chunks.push(forAi.slice(offset, offset + this.deps.aiBatchSize));
+      for (let offset = 0; offset < forAi.length; offset += cfg.batchSize) {
+        chunks.push(forAi.slice(offset, offset + cfg.batchSize));
       }
 
-      /** Circuito: no primeiro 429 da OpenRouter a rodada para de puxar itens. */
+      /** Circuito: no primeiro 429 geral a rodada para de puxar itens. */
       const abort = { hit: false };
       let cursor = 0;
       const next = (): PendingArticle[] | undefined => (abort.hit ? undefined : chunks[cursor++]);
@@ -122,7 +116,7 @@ export class ClassificationService {
       };
 
       await Promise.all(
-        Array.from({ length: Math.max(1, Math.min(this.deps.concurrency, chunks.length)) }, worker),
+        Array.from({ length: Math.max(1, Math.min(cfg.concurrency, chunks.length)) }, worker),
       );
 
       report.pending = await this.deps.repository.countPending();
@@ -169,7 +163,7 @@ export class ClassificationService {
       }
 
       // sem decisao deterministica e texto curto demais: sai da fila como esta
-      if (buildArticleText(article).length < this.deps.minTextChars) {
+      if (buildArticleText(article).length < this.deps.settings.ai().classify.minTextChars) {
         await this.#resolve(article.id, {
           categoryId: null,
           method: null,
@@ -196,6 +190,7 @@ export class ClassificationService {
     report: ClassificationReport,
     abort: { hit: boolean },
   ): Promise<void> {
+    const cfg = this.deps.settings.ai().classify;
     const inputs = chunk.map((article) => ({
       title: article.title,
       description: article.description,
@@ -210,7 +205,7 @@ export class ClassificationService {
         // uma requisicao cobre o lote inteiro
         report.aiCalls += 1;
         const raw = await (this.deps.provider.classifyBatch as (i: ClassifyInput[]) => Promise<AiSummaryResult>)(inputs);
-        mentions = parseClassifiedBatch(raw?.text ?? null, chunk.length, catalog, this.deps.minConfidence);
+        mentions = parseClassifiedBatch(raw?.text ?? null, chunk.length, catalog, cfg.minConfidence);
       } else {
         // provedor sem lote (ou lote de 1): uma requisicao por artigo
         mentions = await this.#classifyOneByOne(inputs, report);
@@ -260,10 +255,11 @@ export class ClassificationService {
     report: ClassificationReport,
   ): Promise<Array<ClassifyMention | null>> {
     const mentions: Array<ClassifyMention | null> = [];
+    const minConfidence = this.deps.settings.ai().classify.minConfidence;
     for (const input of inputs) {
       report.aiCalls += 1;
       const result = await this.deps.provider.classify(input);
-      mentions.push(parseClassifiedContent(result.text, input.categories, this.deps.minConfidence));
+      mentions.push(parseClassifiedContent(result.text, input.categories, minConfidence));
     }
     return mentions;
   }

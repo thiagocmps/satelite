@@ -553,6 +553,71 @@ Quantos artigos aguardando a IA.
 
 ---
 
+## Configuração da IA (runtime)
+
+A tela **IA** (`/config-ia`) consome estas rotas. Os defaults vêm do `.env`; o que foi salvo fica
+em `app_settings` e sobrescreve o env **sem reiniciar** — provedor trocado na próxima chamada, cron
+reagendado na hora. Chaves nunca aparecem em claro: o GET devolve `••••` + sufixo.
+
+### `GET /settings/ai` → `200`
+
+```json
+{
+  "data": {
+    "settings": {
+      "provider": "groq",
+      "fallbackProviders": ["openrouter"],
+      "providers": {
+        "groq": {
+          "apiKey": "••••sUE3",
+          "baseUrl": "https://api.groq.com/openai/v1",
+          "model": "qwen/qwen3.8-27b",
+          "fallbackModels": [],
+          "classifyModel": "qwen/qwen3.8-27b",
+          "classifyFallbackModels": []
+        }
+      },
+      "classify": {
+        "enabled": true, "timeoutMs": 60000, "maxRetries": 2, "batch": 100,
+        "batchSize": 100, "concurrency": 3, "minConfidence": 0.6,
+        "minTextChars": 200, "maxContentChars": 800
+      },
+      "summarize": { "language": "pt-BR", "timeoutMs": 120000, "maxRetries": 3, "maxContentChars": 4000 },
+      "scheduler": { "classifyEnabled": true, "classifyCron": "*/10 * * * *" }
+    },
+    "defaults": { "…": "mesmo formato, mascarado — o que vale sem override" },
+    "fields": [
+      { "key": "classify.batch", "section": "classify", "type": "number", "label": "Artigos por rodada", "min": 1, "max": 500, "order": 510 }
+    ],
+    "providers": [
+      { "id": "groq", "label": "Groq", "keyUrl": "https://console.groq.com/keys" }
+    ],
+    "version": 1
+  }
+}
+```
+
+`fields` são os **descritores** que a UI renderiza por `type`/`section` — knob novo no backend
+aparece na tela sozinho (1 linha no schema + 1 no descritor). `version` muda a cada save: é o
+sinal que o `AiHub` usa para reconstruir o provedor.
+
+### `PATCH /settings/ai` → `200`
+
+PATCH parcial (deep-merge sobre o que já está salvo): envie **só o que mudou**. O corpo é validado
+no formato completo — provedor existe no registry, cadeia de fallback sem repetição, chave presente
+para quem será usado, cron de 5 campos válido — e, depois de persistir, os appliers rodam na hora
+(provedor reconstruído, cron reagendado). A resposta é a nova visão, no formato do GET.
+
+```json
+{ "classify": { "batch": 50 } }
+```
+
+`providers.<id>.apiKey: ""` = "manter a atual" (a máscara do GET nunca vale como chave nova).
+Falhas respondem o envelope padrão `400 VALIDATION_ERROR` com o problema
+(`"chave obrigatoria para o provedor \"groq\" ..."`, `"expressao cron invalida"`).
+
+---
+
 ## Grupos e notícias salvas
 
 Arquivo pessoal do leitor. Um **grupo** é uma coleção temática que atravessa

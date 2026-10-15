@@ -1,5 +1,6 @@
 import type { Logger } from './config/logger.js';
 import { createAiProvider } from './integrations/ai/ai.registry.js';
+import { AiHub } from './integrations/ai/ai.hub.js';
 import { createFeedLoader } from './integrations/rss/rss.adapter.js';
 import { PgCategoriesRepository } from './modules/categories/categories.repository.js';
 import { ClassificationService } from './modules/classification/classification.service.js';
@@ -10,6 +11,8 @@ import { PgNewsRepository } from './modules/news/news.repository.js';
 import { NewsService } from './modules/news/news.service.js';
 import { PgSavedRepository } from './modules/saved/saved.repository.js';
 import { SavedService } from './modules/saved/saved.service.js';
+import { PgSettingsRepository } from './modules/settings/settings.repository.js';
+import { SettingsService } from './modules/settings/settings.service.js';
 import { PgSourcesRepository } from './modules/sources/sources.repository.js';
 import { PgSummariesRepository } from './modules/summaries/summaries.repository.js';
 import { SummariesService } from './modules/summaries/summaries.service.js';
@@ -20,6 +23,10 @@ import type { Pool } from 'pg';
  * Composicao unica: resolve o que e Postgres, o que e integracao externa e
  * liga tudo. Services recebem suas dependencias por construtor, o que permite
  * testar com doubles sem subir banco nem IA.
+ *
+ * Config de IA vem do `SettingsService` (.env + app_settings), lida a cada
+ * operacao: mudancas salvas na tela valem sem reiniciar. O provedor passa a
+ * ser o `AiHub`, que se reconstrói quando a versao da config muda.
  */
 export function createContainer(env: Env, logger: Logger, pool: Pool) {
   const newsRepository = new PgNewsRepository(pool);
@@ -28,7 +35,8 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
   const summariesRepository = new PgSummariesRepository(pool);
   const runsRepository = new PgIngestionRunsRepository(pool);
   const savedRepository = new PgSavedRepository(pool);
-  const aiProvider = createAiProvider(env);
+  const settings = new SettingsService(env, new PgSettingsRepository(pool), logger);
+  const aiProvider = new AiHub(settings, createAiProvider);
 
   /** Id da categoria 'politica' (resolvido uma vez; protege politica que cita esporte). */
   let politicaCategoryIdPromise: Promise<string | null> | null = null;
@@ -45,8 +53,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     listRules: () => categoriesRepository.listRules(),
     logger,
     concurrency: env.INGEST_CONCURRENCY,
-    aiClassifyEnabled: env.AI_CLASSIFY_ENABLED,
-    minClassifyTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
+    settings,
     blockSports: env.CONTENT_FILTER_SPORTS,
     politicaCategoryId,
   });
@@ -56,14 +63,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
     categories: categoriesRepository,
     listRules: () => categoriesRepository.listRules(),
     provider: aiProvider,
-    enabled: env.AI_CLASSIFY_ENABLED,
-    language: env.AI_LANGUAGE,
-    maxContentChars: env.AI_MAX_CONTENT_CHARS,
-    minTextChars: env.AI_CLASSIFY_MIN_TEXT_CHARS,
-    minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
-    batchSize: env.AI_CLASSIFY_BATCH,
-    aiBatchSize: env.AI_CLASSIFY_BATCH_SIZE,
-    concurrency: env.AI_CLASSIFY_CONCURRENCY,
+    settings,
     blockSports: env.CONTENT_FILTER_SPORTS,
     logger,
   });
@@ -71,6 +71,7 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
   return {
     env,
     pool,
+    settings,
     newsRepository,
     categoriesRepository,
     sourcesRepository,
@@ -84,16 +85,14 @@ export function createContainer(env: Env, logger: Logger, pool: Pool) {
       summaries: summariesRepository,
       provider: aiProvider,
       promptVersion: env.AI_PROMPT_VERSION,
-      language: env.AI_LANGUAGE,
+      settings,
       logger,
     }),
     saved: new SavedService({
       repository: savedRepository,
       news: newsRepository,
       provider: aiProvider,
-      language: env.AI_LANGUAGE,
-      maxContentChars: env.AI_MAX_CONTENT_CHARS,
-      minConfidence: env.AI_CLASSIFY_MIN_CONFIDENCE,
+      settings,
       logger,
     }),
     ingestion,

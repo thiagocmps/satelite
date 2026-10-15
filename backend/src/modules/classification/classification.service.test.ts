@@ -1,12 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
+import { loadEnv } from '../../config/env.js';
 import type { Logger } from '../../config/logger.js';
 import { ConflictError, ExternalServiceError } from '../../core/errors.js';
 import type { AiProvider, AiSummaryResult, ClassifyInput } from '../../integrations/ai/ai.provider.js';
 import type { CategoriesRepository } from '../categories/categories.repository.js';
+import { aiDefaults } from '../settings/settings.defaults.js';
+import type { AiSettings, AiSettingsSource } from '../settings/settings.types.js';
 import { ClassificationService, type ClassificationDeps } from './classification.service.js';
 import type { ClassificationRepository, PendingArticle, ResolveVerdict } from './classification.repository.js';
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Logger;
+
+/** Ajustes de IA falsos: defaults do .env com overrides pontuais por teste. */
+const settingsSource = (classify: Partial<AiSettings['classify']> = {}): AiSettingsSource => {
+  const base = aiDefaults(
+    loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+  );
+  return { ai: () => ({ ...base, classify: { ...base.classify, ...classify } }) };
+};
 
 const categories = [
   { id: 'cat-tech', slug: 'tecnologia', name: 'Tecnologia', description: null, color: null, articleCount: 0, createdAt: new Date() },
@@ -93,8 +104,9 @@ class FakeBatchProvider extends FakeProvider {
 function setup(
   pending: PendingArticle[],
   providerBehavior?: (input: ClassifyInput) => Promise<string>,
-  overrides: Partial<ClassificationDeps> = {},
+  overrides: Partial<ClassificationDeps> & { classify?: Partial<AiSettings['classify']> } = {},
 ) {
+  const { classify = {}, ...deps } = overrides;
   const repository = new FakeRepository(pending);
   const provider = new FakeProvider(
     providerBehavior ?? (() => Promise.resolve('{"categorySlug":null,"confidence":0.5}')),
@@ -104,19 +116,20 @@ function setup(
     categories: categoriesFake,
     listRules: async () => rules,
     provider,
-    enabled: true,
-    language: 'pt-BR',
-    maxContentChars: 500,
-    minTextChars: 40,
-    minConfidence: 0.5,
-    batchSize: 100,
-    // 1 = uma chamada por artigo (o FakeProvider nao implementa lote); os
-    // testes de lote sobrescrevem com um provider que sim.
-    aiBatchSize: 1,
-    concurrency: 2,
+    settings: settingsSource({
+      enabled: true,
+      minTextChars: 40,
+      minConfidence: 0.5,
+      batch: 100,
+      // 1 = uma chamada por artigo (o FakeProvider nao implementa lote); os
+      // testes de lote sobrescrevem com um provider que sim.
+      batchSize: 1,
+      concurrency: 2,
+      ...classify,
+    }),
     blockSports: false,
     logger,
-    ...overrides,
+    ...deps,
   });
   return { service, repository, provider };
 }
@@ -189,15 +202,15 @@ describe('ClassificationService', () => {
       categories: categoriesFake,
       listRules: async () => rules,
       provider,
-      enabled: true,
-      language: 'pt-BR',
-      maxContentChars: 500,
-      minTextChars: 40,
-      minConfidence: 0.5,
-      batchSize: 100,
-      // 3 artigos cabem numa unica requisicao
-      aiBatchSize: 3,
-      concurrency: 1,
+      settings: settingsSource({
+        enabled: true,
+        minTextChars: 40,
+        minConfidence: 0.5,
+        batch: 100,
+        // 3 artigos cabem numa unica requisicao
+        batchSize: 3,
+        concurrency: 1,
+      }),
       blockSports: false,
       logger,
     });
@@ -304,7 +317,7 @@ describe('ClassificationService', () => {
     const { service, repository, provider } = setup(
       [ambiguousArticle, { ...ambiguousArticle, id: 'a-2' }, { ...ambiguousArticle, id: 'a-3' }],
       () => Promise.reject(new ExternalServiceError('AI_RATE_LIMIT', 'cota zerada')),
-      { concurrency: 1 },
+      { classify: { concurrency: 1 } },
     );
 
     const report = await service.runOnce();
@@ -370,14 +383,14 @@ describe('ClassificationService', () => {
       categories: categoriesFake,
       listRules: async () => rules,
       provider: new FakeProvider(() => Promise.reject(new Error('nao deveria chamar'))),
-      enabled: false,
-      language: 'pt-BR',
-      maxContentChars: 500,
-      minTextChars: 40,
-      minConfidence: 0.5,
-      batchSize: 100,
-      aiBatchSize: 1,
-      concurrency: 2,
+      settings: settingsSource({
+        enabled: false,
+        minTextChars: 40,
+        minConfidence: 0.5,
+        batch: 100,
+        batchSize: 1,
+        concurrency: 2,
+      }),
       blockSports: true,
       logger,
     });

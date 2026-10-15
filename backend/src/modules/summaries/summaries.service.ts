@@ -3,6 +3,7 @@ import { errorMessage, NotFoundError } from '../../core/errors.js';
 import { sha256 } from '../../core/fingerprint.js';
 import type { AiProvider } from '../../integrations/ai/ai.provider.js';
 import type { Article } from '../news/news.types.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import type { SummariesRepository, SummaryRecord } from './summaries.repository.js';
 
 export type AiSummaryPayload = {
@@ -26,7 +27,8 @@ export type SummariesDeps = {
   summaries: SummariesRepository;
   provider: AiProvider;
   promptVersion: string;
-  language: string;
+  /** Idioma do prompt lido a cada geracao (config em runtime). */
+  settings: AiSettingsSource;
   logger: Logger;
 };
 
@@ -78,7 +80,8 @@ export class SummariesService {
   }
 
   async #generate(article: Article, inputHash: string): Promise<AiSummaryPayload> {
-    const { provider, promptVersion, language } = this.deps;
+    const { provider, promptVersion } = this.deps;
+    const language = this.deps.settings.ai().summarize.language;
 
     try {
       const result = await provider.summarize({

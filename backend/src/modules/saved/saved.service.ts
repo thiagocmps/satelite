@@ -5,6 +5,7 @@ import { ConflictError, ExternalServiceError, NotFoundError } from '../../core/e
 import { parseGroupSuggestion, type GroupSuggestion } from '../../integrations/ai/ai.group.js';
 import type { AiProvider } from '../../integrations/ai/ai.provider.js';
 import type { Article, Paginated } from '../news/news.types.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import { buildCollectionMarkdown } from './saved.export.js';
 import {
   parseCollectionJson,
@@ -52,9 +53,8 @@ export type SavedDeps = {
   repository: SavedRepository;
   news: { findById(id: string): Promise<Article | null> };
   provider: AiProvider;
-  language: string;
-  maxContentChars: number;
-  minConfidence: number;
+  /** Piso de confianca da sugestao de grupo (config em runtime). */
+  settings: AiSettingsSource;
   logger: Logger;
 };
 
@@ -285,7 +285,11 @@ export class SavedService {
       groups: offered,
     });
 
-    const suggestion = parseGroupSuggestion(raw.text, offered, this.deps.minConfidence);
+    const suggestion = parseGroupSuggestion(
+      raw.text,
+      offered,
+      this.deps.settings.ai().classify.minConfidence,
+    );
     if (!suggestion) {
       throw new ExternalServiceError('AI_BAD_RESPONSE', 'Resposta de sugestao de grupo ilegivel');
     }

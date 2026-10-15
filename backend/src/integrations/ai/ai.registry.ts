@@ -1,85 +1,74 @@
-import type { Env } from '../../config/env.js';
+import type { AiSettings } from '../../modules/settings/settings.types.js';
 import type { AiProvider } from './ai.provider.js';
 import { CompositeProvider } from './composite.provider.js';
 import { GroqProvider } from './groq.provider.js';
 import { OpenCodeProvider } from './opencode.provider.js';
+import type { OpenAICompatibleConfig } from './openai-compatible.provider.js';
 import { OpenRouterProvider } from './openrouter.provider.js';
 
 /**
- * Registro de provedores. Adicionar um provedor = implementar AiProvider e
- * registrar uma linha aqui; nenhuma outra camada muda.
- *
- * AI_PROVIDER escolhe o principal; AI_FALLBACK_PROVIDERS (lista) acrescenta
- * alternativas. Com mais de um, createAiProvider devolve um CompositeProvider
- * que tenta o principal e falha sobre para o proximo em cota zerada / 429 /
- * 5xx / gateway fora.
+ * Registro de provedores. Adicionar um provedor = subclasse + 1 linha em
+ * `builders` + 1 entrada em `AI_PROVIDER_META` (+ defaults em
+ * settings.defaults.ts e vars no env.ts). A tela de config descobre os cards
+ * por `AI_PROVIDER_META` — nada de frontend para atualizar.
  */
-export function createAiProvider(env: Env): AiProvider {
-  const registry: Record<string, () => AiProvider> = {
-    openrouter: () =>
-      new OpenRouterProvider({
-        apiKey: env.OPENROUTER_API_KEY,
-        baseUrl: env.OPENROUTER_BASE_URL,
-        model: env.AI_MODEL,
-        fallbackModels: env.AI_FALLBACK_MODELS,
-        timeoutMs: env.AI_TIMEOUT_MS,
-        maxRetries: env.AI_MAX_RETRIES,
-        language: env.AI_LANGUAGE,
-        maxContentChars: env.AI_MAX_CONTENT_CHARS,
-        appUrl: env.APP_URL,
-        appName: env.APP_NAME,
-        classifyModel: env.AI_CLASSIFY_MODEL,
-        classifyFallbackModels: env.AI_CLASSIFY_FALLBACK_MODELS,
-        classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
-        classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
-        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
-      }),
-    opencode: () =>
-      new OpenCodeProvider({
-        apiKey: env.OPENCODE_API_KEY,
-        baseUrl: env.OPENCODE_BASE_URL,
-        model: env.OPENCODE_MODEL,
-        fallbackModels: env.OPENCODE_FALLBACK_MODELS,
-        timeoutMs: env.AI_TIMEOUT_MS,
-        maxRetries: env.AI_MAX_RETRIES,
-        language: env.AI_LANGUAGE,
-        maxContentChars: env.AI_MAX_CONTENT_CHARS,
-        classifyModel: env.OPENCODE_CLASSIFY_MODEL,
-        classifyFallbackModels: env.OPENCODE_CLASSIFY_FALLBACK_MODELS,
-        classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
-        classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
-        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
-      }),
-    groq: () =>
-      new GroqProvider({
-        apiKey: env.GROQ_API_KEY,
-        baseUrl: env.GROQ_BASE_URL,
-        model: env.GROQ_MODEL,
-        fallbackModels: env.GROQ_FALLBACK_MODELS,
-        timeoutMs: env.AI_TIMEOUT_MS,
-        maxRetries: env.AI_MAX_RETRIES,
-        language: env.AI_LANGUAGE,
-        maxContentChars: env.AI_MAX_CONTENT_CHARS,
-        classifyModel: env.GROQ_CLASSIFY_MODEL,
-        classifyFallbackModels: env.GROQ_CLASSIFY_FALLBACK_MODELS,
-        classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
-        classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
-        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
-      }),
+export const AI_PROVIDER_META = {
+  groq: { label: 'Groq', keyUrl: 'https://console.groq.com/keys' },
+  openrouter: { label: 'OpenRouter', keyUrl: 'https://openrouter.ai/keys' },
+  opencode: { label: 'OpenCode Zen', keyUrl: 'https://opencode.ai/console' },
+} as const;
+
+export type AiProviderId = keyof typeof AI_PROVIDER_META;
+
+export const AI_PROVIDER_IDS = Object.keys(AI_PROVIDER_META) as AiProviderId[];
+
+type ProviderConfig = Omit<OpenAICompatibleConfig, 'name'>;
+
+/**
+ * Monta a cadeia de provedores a partir da CONFIGURACAO EFETIVA (defaults do
+ * .env + overrides do banco — ver modules/settings). O primeiro da cadeia e o
+ * principal; os demais so entram em falha recuperavel (cota, 429, 5xx, timeout).
+ */
+export function createAiProvider(settings: AiSettings): AiProvider {
+  const config = (id: AiProviderId): ProviderConfig => {
+    const provider = settings.providers[id];
+    if (!provider) throw new Error(`configuracao do provedor "${id}" ausente`);
+    return {
+      apiKey: provider.apiKey,
+      baseUrl: provider.baseUrl,
+      model: provider.model,
+      fallbackModels: provider.fallbackModels,
+      timeoutMs: settings.summarize.timeoutMs,
+      maxRetries: settings.summarize.maxRetries,
+      language: settings.summarize.language,
+      maxContentChars: settings.summarize.maxContentChars,
+      classifyModel: provider.classifyModel,
+      classifyFallbackModels: provider.classifyFallbackModels,
+      classifyTimeoutMs: settings.classify.timeoutMs,
+      classifyMaxRetries: settings.classify.maxRetries,
+      classifyMaxContentChars: settings.classify.maxContentChars,
+    };
   };
 
-  const names = [env.AI_PROVIDER, ...env.AI_FALLBACK_PROVIDERS.filter((name) => name !== env.AI_PROVIDER)];
+  // Record<AiProviderId, ...> exige TODOS os ids: provedor novo sem builder
+  // nao compila (e sem meta tambem nao — AI_PROVIDER_IDS deriva dela).
+  const builders: Record<AiProviderId, () => AiProvider> = {
+    groq: () => new GroqProvider(config('groq')),
+    openrouter: () => new OpenRouterProvider(config('openrouter')),
+    opencode: () => new OpenCodeProvider(config('opencode')),
+  };
 
-  const providers = names.map((name) => {
-    const factory = registry[name];
-    if (!factory) {
-      throw new Error(
-        `AI_PROVIDER/AI_FALLBACK_PROVIDERS desconhecido: "${name}". Disponiveis: ${Object.keys(registry).join(', ')}`,
-      );
+  const chain = [settings.provider, ...settings.fallbackProviders];
+  const providers: AiProvider[] = [];
+  for (const id of chain) {
+    const build = builders[id as AiProviderId];
+    if (!build) {
+      throw new Error(`provedor de IA desconhecido: "${id}" (registrados: ${AI_PROVIDER_IDS.join(', ')})`);
     }
-    return factory();
-  });
+    providers.push(build());
+  }
 
-  if (providers.length === 1) return providers[0]!;
-  return new CompositeProvider(providers);
+  const [primary, ...rest] = providers;
+  if (!primary) throw new Error('cadeia de provedores de IA vazia');
+  return rest.length > 0 ? new CompositeProvider([primary, ...rest]) : primary;
 }

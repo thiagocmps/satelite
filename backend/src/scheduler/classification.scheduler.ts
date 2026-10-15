@@ -7,26 +7,28 @@ import type { Container } from '../container.js';
  * fila no clique do botao "Classificar pendentes" (SourcesPage); com ela, a
  * fila drena sozinha. Fila vazia = ciclo nao faz nenhuma chamada de IA.
  *
- * Desligue com ENABLE_CLASSIFY_SCHEDULER=false (ex.: quota apertada e voce
- * prefere classificar sob demanda).
+ * Cadencia e on/off vem da CONFIGURACAO EM RUNTIME (tela /config-ia): o
+ * server.ts repara este agendador a cada save, entao trocar o cron ali vale
+ * na hora. Desligue pela tela (Agendador automatico) ou pelo .env
+ * (ENABLE_CLASSIFY_SCHEDULER) — o que vier de override vence.
  */
 export function startClassificationScheduler(container: Container, logger: Logger): ScheduledTask | null {
-  const { env } = container;
+  const ai = container.settings.ai();
 
-  if (!env.AI_CLASSIFY_ENABLED) {
-    logger.info('agendador de classificacao desabilitado (AI_CLASSIFY_ENABLED=false)');
+  if (!ai.classify.enabled) {
+    logger.info('agendador de classificacao desabilitado (classificacao por IA desligada na config)');
     return null;
   }
-  if (!env.ENABLE_CLASSIFY_SCHEDULER) {
-    logger.info('agendador de classificacao desabilitado (ENABLE_CLASSIFY_SCHEDULER=false)');
+  if (!ai.scheduler.classifyEnabled) {
+    logger.info('agendador de classificacao desabilitado (agendador desligado na config)');
     return null;
   }
-  if (!cron.validate(env.CLASSIFY_CRON)) {
-    throw new Error(`CLASSIFY_CRON invalido: "${env.CLASSIFY_CRON}" (use expressao cron de 5 campos)`);
+  if (!cron.validate(ai.scheduler.classifyCron)) {
+    throw new Error(`CLASSIFY_CRON invalido: "${ai.scheduler.classifyCron}" (use expressao cron de 5 campos)`);
   }
 
   const task = cron.schedule(
-    env.CLASSIFY_CRON,
+    ai.scheduler.classifyCron,
     async () => {
       if (container.classification.isRunning) {
         logger.warn('classificacao anterior ainda em andamento; ciclo ignorado');
@@ -45,6 +47,6 @@ export function startClassificationScheduler(container: Container, logger: Logge
     { name: 'classification', noOverlap: true, timezone: 'UTC' },
   );
 
-  logger.info({ cron: env.CLASSIFY_CRON }, 'agendador de classificacao ativo');
+  logger.info({ cron: ai.scheduler.classifyCron }, 'agendador de classificacao ativo');
   return task;
 }

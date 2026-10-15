@@ -1,13 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
+import { loadEnv } from '../../config/env.js';
 import { NotFoundError } from '../../core/errors.js';
 import { sha256 } from '../../core/fingerprint.js';
 import { sanitizeSummary } from '../../integrations/ai/ai.prompts.js';
 import type { AiProvider, SummarizeInput } from '../../integrations/ai/ai.provider.js';
 import type { Article } from '../news/news.types.js';
+import { aiDefaults } from '../settings/settings.defaults.js';
+import type { AiSettingsSource } from '../settings/settings.types.js';
 import { SummariesService, type SummariesDeps } from './summaries.service.js';
 import type { SummaryRecord, SummarySave, SummariesRepository } from './summaries.repository.js';
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as SummariesDeps['logger'];
+
+/** Config de IA falsa: defaults do .env (idioma pt-BR, como em producao). */
+const settingsSource = (): AiSettingsSource => ({
+  ai: () =>
+    aiDefaults(
+      loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+    ),
+});
 
 const article: Article = {
   id: 'a-1',
@@ -106,7 +117,7 @@ function setup(behavior: () => Promise<{ text: string; promptTokens?: number; co
     summaries: repository,
     provider,
     promptVersion: 'v1',
-    language: 'pt-BR',
+    settings: settingsSource(),
     logger,
   };
   return { service: new SummariesService(deps), repository, provider };

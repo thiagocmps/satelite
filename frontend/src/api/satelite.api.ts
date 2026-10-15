@@ -1,5 +1,7 @@
 import { api, buildQuery } from './client';
 import type {
+  AiSettingsPatch,
+  AiSettingsView,
   AiSummaryPayload,
   Article,
   Category,
@@ -198,4 +200,15 @@ export function updateNote(
 
 export function suggestGroup(articleId: string): Promise<{ data: GroupSuggestion }> {
   return api.post<{ data: GroupSuggestion }>('/groups/suggest', { articleId });
+}
+
+/* --------------------------------------------- configuracao da IA (runtime) */
+
+export function fetchAiSettings(): Promise<{ data: AiSettingsView }> {
+  return api.get<{ data: AiSettingsView }>('/settings/ai');
+}
+
+/** PATCH parcial: o backend valida, persiste (app_settings) e aplica na hora. */
+export function updateAiSettings(patch: AiSettingsPatch): Promise<{ data: AiSettingsView }> {
+  return api.patch<{ data: AiSettingsView }>('/settings/ai', patch);
 }

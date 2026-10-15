@@ -186,6 +186,28 @@ export function useRunClassification(onSuccess?: (report: ClassificationReport) 
   });
 }
 
+export const aiSettingsKeys = {
+  current: ['settings', 'ai'] as const,
+};
+
+/** Config efetiva da IA (descritores + provedores + valores, chave mascarada). */
+export function useAiSettings() {
+  return useQuery({ queryKey: aiSettingsKeys.current, queryFn: api.fetchAiSettings });
+}
+
+/** Salva e ja devolve a visao nova aplicada (o backend roda os appliers). */
+export function useUpdateAiSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateAiSettings,
+    onSuccess: (response) => {
+      queryClient.setQueryData(aiSettingsKeys.current, response);
+      // a fila muda de significado conforme a config (enabled, lote...)
+      void queryClient.invalidateQueries({ queryKey: classificationKeys.status });
+    },
+  });
+}
+
 export const savedKeys = {
   groups: ['saved', 'groups'] as const,
   ids: ['saved', 'ids'] as const,
