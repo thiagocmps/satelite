@@ -47,6 +47,8 @@ export type Article = {
   /** Confianca da IA entre 0 e 1 (null quando nao foi a IA). */
   categoryConfidence: number | null;
   summary: SummaryView | null;
+  /** Anotacao pessoal do leitor (uma por noticia; sobrevive a desfazer o salvamento). */
+  note: string | null;
 };
 
 export type AiSummaryPayload = SummaryView & { cached: boolean };
@@ -172,7 +174,7 @@ export type GroupSuggestion = {
   confidence: number;
 };
 
-/** Resultado do import de colecao (Markdown): o que entrou, o que ja la estava. */
+/** Resultado do import de colecao (Markdown ou JSON): o que entrou, o que ja la estava. */
 export type CollectionImportReport = {
   group: NewsGroup;
   total: number;
@@ -180,6 +182,8 @@ export type CollectionImportReport = {
   already: number;
   notFound: number;
   missingTitles: string[];
+  /** Anotacoes gravadas (so as nao vazias de itens que casaram por URL). */
+  notesApplied: number;
 };
 
 /** Filtros da listagem de noticias (espelha a query da API). */

@@ -2,9 +2,11 @@ import { Router, text, type RequestHandler } from 'express';
 import { validate } from '../../middleware/validate.middleware.js';
 import {
   articleIdBodySchema,
+  articleIdParamsSchema,
   createGroupSchema,
   exportFormatSchema,
   groupIdParamsSchema,
+  noteBodySchema,
   savedListQuerySchema,
   savedParamsSchema,
   updateGroupSchema,
@@ -24,7 +26,7 @@ export function createSavedRoutes(
   router.get('/groups', controller.listGroups);
   router.post('/groups', validate({ body: createGroupSchema }), controller.createGroup);
   router.post('/groups/suggest', suggestLimiter, validate({ body: articleIdBodySchema }), controller.suggest);
-  // corpo cru (Markdown do arquivo): express.text montado so nesta rota
+  // corpo cru (Markdown ou JSON do arquivo, detectado pelo conteudo)
   router.post('/groups/import', text({ limit: '2mb', type: () => true }), controller.importGroup);
   router.patch('/groups/:id', validate({ params: groupIdParamsSchema, body: updateGroupSchema }), controller.updateGroup);
   router.delete('/groups/:id', validate({ params: groupIdParamsSchema }), controller.removeGroup);
@@ -36,6 +38,12 @@ export function createSavedRoutes(
 
   router.get('/saved', validate({ query: savedListQuerySchema }), controller.listSaved);
   router.get('/saved/ids', controller.listSavedIds);
+  // a nota e da noticia, nao da colecao: rota propria, sem grupo no caminho
+  router.put(
+    '/saved/articles/:articleId/note',
+    validate({ params: articleIdParamsSchema, body: noteBodySchema }),
+    controller.setNote,
+  );
 
   return router;
 }

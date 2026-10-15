@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from '../api/satelite.api';
-import type { ClassificationReport, NewsFilters, SourcesImportReport } from '../api/types';
+import type {
+  Article,
+  ClassificationReport,
+  NewsFilters,
+  SourcesImportReport,
+} from '../api/types';
 
 /**
  * Hooks = unico lugar do frontend que conhece a API. Componentes so consomem
@@ -262,4 +267,23 @@ export function useUnsaveArticle() {
 /** Pede a IA um grupo (existente ou novo) para a noticia. */
 export function useSuggestGroup() {
   return useMutation({ mutationFn: (articleId: string) => api.suggestGroup(articleId) });
+}
+
+/**
+ * Anotacao pessoal da noticia. Atualiza o cache do detalhe na hora (o usuario
+ * esta olhando a nota) e revalida os salvos, onde a nota tambem aparece.
+ */
+export function useUpdateNote(articleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (note: string) => api.updateNote(articleId, note),
+    onSuccess: (response) => {
+      // escrita otimista no detalhe: evita esperar o refetch pra mostrar a nota
+      queryClient.setQueryData<{ data: Article }>(newsKeys.detail(articleId), (previous) =>
+        previous ? { ...previous, data: { ...previous.data, note: response.data.note } } : previous,
+      );
+      void queryClient.invalidateQueries({ queryKey: savedKeys.ids });
+      void queryClient.invalidateQueries({ queryKey: ['saved', 'list'] });
+    },
+  });
 }

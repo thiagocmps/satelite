@@ -50,6 +50,14 @@ export function createSavedController(saved: SavedService) {
       res.json({ data: await saved.listSavedIds() });
     },
 
+    /** Anotação pessoal da notícia. Corpo `{ note }`; string vazia limpa. */
+    setNote: async (req: Request, res: Response) => {
+      const { articleId } = valid<{ articleId: string }>(req, 'params');
+      const { note } = valid<{ note: string }>(req, 'body');
+      await saved.setNote(articleId, note);
+      res.json({ data: { articleId, note } });
+    },
+
     /** Download da coleção em Markdown (leitura) ou JSON (backup). */
     exportGroup: async (req: Request, res: Response) => {
       const { id } = valid<{ id: string }>(req, 'params');
@@ -68,12 +76,17 @@ export function createSavedController(saved: SavedService) {
     },
 
     /**
-     * Corpo cru: o Markdown do arquivo, lido pelo text() da rota (mesmo
-     * arranjo do import de fontes). Erros de formato viram 400.
+     * Corpo cru: o arquivo (Markdown ou JSON, detectado pelo conteudo), lido
+     * pelo text() da rota (mesmo arranjo do import de fontes). Se o
+     * express.json() global ja parseou o corpo (content-type application/json),
+     * re-serializa: senao um import de JSON via curl com esse header cairia
+     * como vazio. Erros de formato viram 400.
      */
     importGroup: async (req: Request, res: Response) => {
-      const markdown = typeof req.body === 'string' ? req.body : '';
-      res.status(201).json({ data: await saved.importGroup(markdown) });
+      const body = req.body;
+      const raw =
+        typeof body === 'string' ? body : body && typeof body === 'object' ? JSON.stringify(body) : '';
+      res.status(201).json({ data: await saved.importGroup(raw) });
     },
   };
 }

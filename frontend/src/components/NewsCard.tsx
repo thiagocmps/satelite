@@ -31,6 +31,11 @@ export function NewsCard({ article }: Props) {
             </span>
           ) : null}
           {article.summary ? <span className="badge badge--ai">✦ resumo IA</span> : null}
+          {article.note ? (
+            <span className="badge badge--note" title={article.note}>
+              ✎ anotação
+            </span>
+          ) : null}
         </div>
 
         <Link to={`/noticias/${article.id}`}>
@@ -38,6 +43,8 @@ export function NewsCard({ article }: Props) {
         </Link>
 
         {article.description ? <p className="news-card__excerpt">{article.description}</p> : null}
+
+        {article.note ? <p className="news-card__note">✎ {article.note}</p> : null}
 
         <div className="news-card__footer">
           <span>{article.source.name}</span>

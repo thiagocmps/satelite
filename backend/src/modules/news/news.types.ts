@@ -47,6 +47,8 @@ export type Article = {
   /** Confianca da IA entre 0 e 1 (null quando nao foi a IA). */
   categoryConfidence: number | null;
   summary: SummaryView | null;
+  /** Anotacao pessoal do leitor (uma por noticia; sobrevive a desfazer o salvamento). */
+  note: string | null;
 };
 
 /** Noticia normalizada, pronta para insercao (pre-ou-pos-deduplicacao). */

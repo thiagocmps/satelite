@@ -25,11 +25,13 @@ const article: Article = {
   categoryMethod: null,
   categoryConfidence: null,
   summary: null,
+  note: null,
 };
 
 function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> = {}) {
   const saved: Array<[string, string]> = [];
   const created: Array<{ name: string }> = [];
+  const notes = new Map<string, string | null>();
   const repository = {
     findGroupById: async (id: string) => (id === 'g-1' ? group : null),
     updateGroup: async () => null,
@@ -41,6 +43,13 @@ function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> 
       saved.push([groupId, articleId]);
     },
     listGroups: async () => overrides.groups ?? [group],
+    setNote: async (articleId: string, note: string | null) => {
+      notes.set(articleId, note);
+    },
+    setNotes: async (entries: Array<{ articleId: string; note: string }>) => {
+      for (const entry of entries) notes.set(entry.articleId, entry.note);
+      return entries.length;
+    },
   } as unknown as SavedRepository;
 
   const news = { findById: async (id: string) => (id === 'a-1' ? article : null) };
@@ -62,7 +71,7 @@ function setup(overrides: Partial<{ suggestText: string; groups: NewsGroup[] }> 
 
   const service = new SavedService({ repository, news, provider, language: 'pt-BR', maxContentChars: 500, minConfidence: 0.6, logger } satisfies SavedDeps);
 
-  return { service, saved, created };
+  return { service, saved, created, notes };
 }
 
 describe('SavedService', () => {
@@ -107,5 +116,33 @@ describe('SavedService', () => {
     const { service } = setup({ suggestText: 'nao e json' });
     await expect(service.suggestGroup('a-1')).rejects.toMatchObject({ code: 'AI_BAD_RESPONSE' });
     await expect(service.suggestGroup('a-1')).rejects.toBeInstanceOf(ExternalServiceError);
+  });
+
+  describe('anotação pessoal', () => {
+    it('grava a nota da noticia', async () => {
+      const { service, notes } = setup();
+      await service.setNote('a-1', 'conferir a resolução');
+      expect(notes.get('a-1')).toBe('conferir a resolução');
+    });
+
+    it('espaços nas pontas viram nota limpa; só espaços apagam (null)', async () => {
+      const { service, notes } = setup();
+      await service.setNote('a-1', '  anotação  ');
+      expect(notes.get('a-1')).toBe('anotação');
+
+      await service.setNote('a-1', '   \n  ');
+      expect(notes.get('a-1')).toBeNull();
+    });
+
+    it('preserva linhas internas (nota multilinha)', async () => {
+      const { service, notes } = setup();
+      await service.setNote('a-1', 'linha um\nlinha dois');
+      expect(notes.get('a-1')).toBe('linha um\nlinha dois');
+    });
+
+    it('404 para noticia inexistente', async () => {
+      const { service } = setup();
+      await expect(service.setNote('a-x', 'nota')).rejects.toBeInstanceOf(NotFoundError);
+    });
   });
 });

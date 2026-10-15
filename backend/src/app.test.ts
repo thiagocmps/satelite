@@ -449,6 +449,203 @@ describe('POST /api/v1/groups/import', () => {
     expect(response.status).toBe(400);
     expect(response.body.error.message).toMatch(/vazio/);
   });
+
+  it('aplica as notas dos itens que casaram por URL', async () => {
+    const group = {
+      id: '44444444-4444-4444-8444-444444444444',
+      name: 'Missão Lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    const noted: Array<{ articleId: string; note: string }> = [];
+    container.savedRepository.findGroupByName = async () => group as never;
+    container.savedRepository.findArticleIdsByUrls = async () =>
+      new Map([['https://exemplo.com/sonda', 'a-1']]);
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async () => 1;
+    container.savedRepository.setNotes = async (entries: Array<{ articleId: string; note: string }>) => {
+      noted.push(...entries);
+      return entries.length;
+    };
+
+    const markdownWithNote = `# Missão Lunar
+
+## 1. Sonda entra em órbita
+
+**Anotação:**
+
+conferir a resolução
+
+[Ler original](https://exemplo.com/sonda)
+`;
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send(markdownWithNote);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.notesApplied).toBe(1);
+    expect(noted).toEqual([{ articleId: 'a-1', note: 'conferir a resolução' }]);
+  });
+
+  it('nota vazia no arquivo nao apaga nota existente (setNotes nao e chamado)', async () => {
+    const group = {
+      id: '55555555-5555-5555-8555-555555555555',
+      name: 'Missão Lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    let notesTouched = false;
+    container.savedRepository.findGroupByName = async () => group as never;
+    container.savedRepository.findArticleIdsByUrls = async () =>
+      new Map([['https://exemplo.com/sonda', 'a-1']]);
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async () => 1;
+    container.savedRepository.setNotes = async () => {
+      notesTouched = true;
+      return 0;
+    };
+
+    const markdownEmptyNote = `# Missão Lunar
+
+## 1. Sonda entra em órbita
+
+**Anotação:**
+
+[Ler original](https://exemplo.com/sonda)
+`;
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/octet-stream')
+      .send(markdownEmptyNote);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.notesApplied).toBe(0);
+    expect(notesTouched).toBe(false);
+  });
+
+  it('importa backup em JSON (round-trip do export)', async () => {
+    const group = {
+      id: '66666666-6666-6666-8666-666666666666',
+      name: 'Missão Lunar',
+      color: null,
+      savedCount: 1,
+      createdAt: new Date(),
+    };
+    const noted: Array<{ articleId: string; note: string }> = [];
+    container.savedRepository.findGroupByName = async () => group as never;
+    container.savedRepository.findArticleIdsByUrls = async () =>
+      new Map([['https://exemplo.com/sonda', 'a-1']]);
+    container.savedRepository.listSavedArticleIds = async () => new Set<string>();
+    container.savedRepository.saveMany = async () => 1;
+    container.savedRepository.setNotes = async (entries: Array<{ articleId: string; note: string }>) => {
+      noted.push(...entries);
+      return entries.length;
+    };
+
+    const jsonBackup = JSON.stringify({
+      data: {
+        group: { id: group.id, name: 'Missão Lunar', color: null },
+        articles: [
+          {
+            id: 'a-1',
+            title: 'Sonda entra em órbita',
+            url: 'https://exemplo.com/sonda',
+            note: 'nota multilinha:\n- um\n- dois',
+          },
+        ],
+      },
+    });
+
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/json')
+      .send(jsonBackup);
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({ total: 1, added: 1, notesApplied: 1 });
+    expect(noted).toEqual([{ articleId: 'a-1', note: 'nota multilinha:\n- um\n- dois' }]);
+  });
+
+  it('400 quando o JSON esta malformado', async () => {
+    const response = await request(app)
+      .post('/api/v1/groups/import')
+      .set('content-type', 'application/json')
+      .send('{ "data": ');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('PUT /api/v1/saved/articles/:articleId/note', () => {
+  const ARTICLE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const MISSING_ID = '99999999-9999-4999-8999-999999999999';
+
+  it('grava a nota e devolve o artigo', async () => {
+    container.newsRepository.findById = async (id: string) => (id === ARTICLE_ID ? ({ id } as never) : null);
+    const noted: Array<[string, string | null]> = [];
+    container.savedRepository.setNote = async (articleId: string, note: string | null) => {
+      noted.push([articleId, note]);
+    };
+
+    const response = await request(app)
+      .put(`/api/v1/saved/articles/${ARTICLE_ID}/note`)
+      .send({ note: 'conferir resolução' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ articleId: ARTICLE_ID, note: 'conferir resolução' });
+    expect(noted).toEqual([[ARTICLE_ID, 'conferir resolução']]);
+  });
+
+  it('string vazia limpa a nota (null no banco)', async () => {
+    container.newsRepository.findById = async (id: string) => (id === ARTICLE_ID ? ({ id } as never) : null);
+    const noted: Array<[string, string | null]> = [];
+    container.savedRepository.setNote = async (articleId: string, note: string | null) => {
+      noted.push([articleId, note]);
+    };
+
+    const response = await request(app).put(`/api/v1/saved/articles/${ARTICLE_ID}/note`).send({ note: '   ' });
+
+    expect(response.status).toBe(200);
+    expect(noted).toEqual([[ARTICLE_ID, null]]);
+  });
+
+  it('404 para noticia inexistente', async () => {
+    container.newsRepository.findById = async () => null;
+
+    const response = await request(app).put(`/api/v1/saved/articles/${MISSING_ID}/note`).send({ note: 'x' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('400 quando a nota passa de 2000 caracteres', async () => {
+    const response = await request(app)
+      .put(`/api/v1/saved/articles/${ARTICLE_ID}/note`)
+      .send({ note: 'x'.repeat(2001) });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('400 quando o corpo nao e um objeto com note', async () => {
+    const response = await request(app).put(`/api/v1/saved/articles/${ARTICLE_ID}/note`).send({ texto: 'errado' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('400 quando o articleId nao e um UUID', async () => {
+    const response = await request(app).put('/api/v1/saved/articles/a-1/note').send({ note: 'x' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
 });
 
 describe('rotas inexistentes', () => {

@@ -647,6 +647,27 @@ textarea {
   border-color: transparent;
 }
 
+.badge--note {
+  background: var(--nebula-soft);
+  color: var(--nebula);
+  border-color: transparent;
+}
+
+/* prévia da anotação no card: discreta, itálica, com filete à esquerda */
+.news-card__note {
+  margin-top: var(--sp-1);
+  padding-left: var(--sp-2);
+  border-left: 2px solid color-mix(in srgb, var(--nebula) 45%, transparent);
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .badge--ok {
   background: var(--success-soft);
   color: var(--success);
@@ -789,6 +810,73 @@ textarea {
   gap: var(--sp-4);
   position: sticky;
   top: 84px;
+}
+
+/* ------------------------------------------------------------------ nota */
+
+.note-panel {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+  background: color-mix(in srgb, var(--nebula) 4%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--nebula) 22%, var(--border));
+  border-radius: var(--radius);
+}
+
+.note-panel__head,
+.note-panel__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--nebula);
+  letter-spacing: 0.01em;
+}
+
+.note-panel__foot {
+  margin-top: var(--sp-2);
+  font-weight: 400;
+  justify-content: space-between;
+}
+
+.note-panel__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--nebula-soft);
+  font-size: 0.8rem;
+}
+
+.note-panel__status {
+  font-weight: 400;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+
+.note-panel__input {
+  width: 100%;
+  margin-top: var(--sp-2);
+  padding: 10px 12px;
+  min-height: 88px;
+  resize: vertical;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.note-panel__input:focus {
+  border-color: var(--nebula);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--nebula-soft);
+}
+
+.note-panel__input::placeholder {
+  color: var(--text-faint);
 }
 
 /* ------------------------------------------------------------ resumo IA */

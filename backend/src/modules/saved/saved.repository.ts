@@ -42,6 +42,14 @@ export interface SavedRepository {
   listSaved(query: SavedListQuery): Promise<Paginated<Article>>;
   /** { articleId: [groupId] } — marca os cards sem tocar na consulta quente de /news. */
   listSavedIds(): Promise<Record<string, string[]>>;
+  /**
+   * Grava (ou limpa, com null) a anotacao pessoal da noticia. A nota vive em
+   * articles, nao em saved_articles: ela e sobre a noticia e sobrevive a
+   * desfazer o salvamento.
+   */
+  setNote(articleId: string, note: string | null): Promise<void>;
+  /** Import de colecao: grava varias notas de uma vez. Devolve quantas foram aplicadas. */
+  setNotes(entries: Array<{ articleId: string; note: string }>): Promise<number>;
 }
 
 const SELECT_GROUP = `
@@ -253,5 +261,27 @@ export class PgSavedRepository implements SavedRepository {
     const map: Record<string, string[]> = {};
     for (const row of rows) map[row.article_id] = row.group_ids;
     return map;
+  }
+
+  /** Nota e um campo da noticia: update direto, sem passar pelo vinculo de grupo. */
+  async setNote(articleId: string, note: string | null): Promise<void> {
+    await this.db.query('update articles set note = $2 where id = $1', [articleId, note]);
+  }
+
+  /**
+   * Notas em lote (import). Um update por nota seria N round-trips; aqui vira
+   * uma passada com unnest. Silenciosamente pula articleId inexistente — o
+   * service ja filtra pelos ids que casaram por URL.
+   */
+  async setNotes(entries: Array<{ articleId: string; note: string }>): Promise<number> {
+    if (entries.length === 0) return 0;
+    const { rowCount } = await this.db.query(
+      `update articles a
+          set note = e.note
+         from unnest($1::uuid[], $2::text[]) as e(article_id, note)
+        where a.id = e.article_id`,
+      [entries.map((entry) => entry.articleId), entries.map((entry) => entry.note)],
+    );
+    return rowCount ?? 0;
   }
 }

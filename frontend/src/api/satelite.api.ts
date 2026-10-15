@@ -169,6 +169,17 @@ export function fetchSavedIds(): Promise<{ data: SavedIds }> {
   return api.get<{ data: SavedIds }>('/saved/ids');
 }
 
+/** Anotacao pessoal da noticia. Corpo `{ note }`; string vazia limpa. */
+export function updateNote(
+  articleId: string,
+  note: string,
+): Promise<{ data: { articleId: string; note: string | null } }> {
+  return api.put<{ data: { articleId: string; note: string | null } }>(
+    `/saved/articles/${articleId}/note`,
+    { note },
+  );
+}
+
 export function suggestGroup(articleId: string): Promise<{ data: GroupSuggestion }> {
   return api.post<{ data: GroupSuggestion }>('/groups/suggest', { articleId });
 }

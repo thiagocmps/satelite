@@ -24,6 +24,7 @@ const article: Article = {
   categoryMethod: null,
   categoryConfidence: null,
   summary: null,
+  note: null,
 };
 
 class FakeSummariesRepository implements SummariesRepository {

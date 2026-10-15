@@ -5,7 +5,12 @@ import { parseGroupSuggestion, type GroupSuggestion } from '../../integrations/a
 import type { AiProvider } from '../../integrations/ai/ai.provider.js';
 import type { Article, Paginated } from '../news/news.types.js';
 import { buildCollectionMarkdown } from './saved.export.js';
-import { parseCollectionMarkdown } from './saved.import.js';
+import {
+  parseCollectionJson,
+  parseCollectionMarkdown,
+  type ParsedCollection,
+  type ParsedCollectionItem,
+} from './saved.import.js';
 import type { GroupInput, GroupPatch, NewsGroup, SavedListQuery, SavedRepository } from './saved.repository.js';
 
 /** Teto do export: coleção gigante vira arquivo gigante, e ninguém lê tudo. */
@@ -13,7 +18,16 @@ const EXPORT_MAX_ARTICLES = 500;
 /** Titulos de notícias fora do banco: suficiente pra orientar, sem inflar a resposta. */
 const IMPORT_MISSING_SAMPLE = 10;
 
-/** Resultado da importação de coleção (Markdown -> coleção + vínculos). */
+/**
+ * O import aceita os dois formatos que o export emite. Detecção pelo primeiro
+ * caractere não-branco: JSON começa com `{`, Markdown começa com `#`.
+ * (Também cobre `?format=` errado — o conteúdo manda, não o parâmetro.)
+ */
+function parseCollection(raw: string): ParsedCollection {
+  return raw.trimStart().startsWith('{') ? parseCollectionJson(raw) : parseCollectionMarkdown(raw);
+}
+
+/** Resultado da importação de coleção (Markdown ou JSON -> coleção + vínculos). */
 export type CollectionImportReport = {
   group: NewsGroup;
   /** Itens unicos no arquivo (URL repetida conta uma vez). */
@@ -26,6 +40,8 @@ export type CollectionImportReport = {
   notFound: number;
   /** Amostra dos titulos nao encontrados. */
   missingTitles: string[];
+  /** Anotacoes gravadas (so as nao vazias de itens que casaram por URL). */
+  notesApplied: number;
 };
 
 export type SavedDeps = {
@@ -128,13 +144,17 @@ export class SavedService {
   }
 
   /**
-   * Importa uma coleção de Markdown (o mesmo formato do export). Reusa a
+   * Importa uma coleção de Markdown ou JSON (o formato do export). Reusa a
    * coleção de mesmo nome se existir — importar duas vezes acumula, nunca
    * duplica: o vínculo é idempotente e a URL é a chave de junção.
+   *
+   * Notas: só as não vazias são gravadas, e só nos itens que casaram por URL.
+   * Nota vazia no arquivo NUNCA apaga nota existente — apagar é papel do
+   * editor (ou do PUT /saved/articles/:articleId/note), não da importação.
    */
-  async importGroup(markdown: string): Promise<CollectionImportReport> {
+  async importGroup(raw: string): Promise<CollectionImportReport> {
     // o parser ja entrega o nome tratado e itens unicos por URL
-    const { name, items } = parseCollectionMarkdown(markdown);
+    const { name, items } = parseCollection(raw);
     const group = await this.#findOrCreateGroup(name);
 
     const found = await this.deps.repository.findArticleIdsByUrls(items.map((item) => item.url));
@@ -148,6 +168,8 @@ export class SavedService {
       ids.filter((id) => !alreadyIds.has(id)),
     );
 
+    const notesApplied = await this.#applyNotes(items, found);
+
     const missing = items.filter((item) => !found.has(item.url));
     const report: CollectionImportReport = {
       group,
@@ -156,6 +178,7 @@ export class SavedService {
       already: ids.length - added,
       notFound: missing.length,
       missingTitles: missing.slice(0, IMPORT_MISSING_SAMPLE).map((item) => item.title),
+      notesApplied,
     };
 
     this.deps.logger.info(
@@ -165,10 +188,32 @@ export class SavedService {
         added: report.added,
         already: report.already,
         notFound: report.notFound,
+        notesApplied: report.notesApplied,
       },
-      'colecao importada de Markdown',
+      'colecao importada',
     );
     return report;
+  }
+
+  /** Anotação pessoal de uma noticia. Vazia ou so espaço limpa a nota. */
+  async setNote(articleId: string, note: string): Promise<void> {
+    if (!(await this.deps.news.findById(articleId))) {
+      throw new NotFoundError(`Noticia ${articleId} nao encontrada`);
+    }
+    const trimmed = note.trim();
+    await this.deps.repository.setNote(articleId, trimmed || null);
+  }
+
+  /** Grava as notas não vazias dos itens que existem no banco. */
+  async #applyNotes(items: ParsedCollectionItem[], found: Map<string, string>): Promise<number> {
+    const entries = items.flatMap((item) => {
+      const articleId = found.get(item.url);
+      const note = item.note?.trim();
+      return articleId && note ? [{ articleId, note }] : [];
+    });
+    // sem nada a gravar, nao toca no repositorio (nem um UPDATE inutil)
+    if (entries.length === 0) return 0;
+    return this.deps.repository.setNotes(entries);
   }
 
   /** Reusa coleção de mesmo nome (sem diferenciar maiúsculas) ou cria uma nova. */

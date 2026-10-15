@@ -1,18 +1,67 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SaveButton } from '../components/SaveButton';
 import { SummaryPanel } from '../components/SummaryPanel';
 import { ErrorBox } from '../components/States';
-import { useArticle } from '../hooks/useSatelite';
+import { useArticle, useSavedIds, useUpdateNote } from '../hooks/useSatelite';
 import { formatDateTime, hostFromUrl } from '../utils/format';
 
 const PREVIEW_CHARS = 1200;
+/** Anotacao: espera esse intervalo apos o usuario parar de digitar. */
+const NOTE_DEBOUNCE_MS = 800;
+const NOTE_MAX_CHARS = 2000;
 
 export function NewsDetailPage() {
   const { id = '' } = useParams();
   const article = useArticle(id);
   const [expanded, setExpanded] = useState(false);
+
+  const detail = article.data?.data;
+  const savedIds = useSavedIds();
+  // so vale a pena anotar uma noticia salva: a nota sobrevive a desfazer o
+  // salvamento, mas o editor aparece so enquanto ela esta salva
+  const isSaved = detail ? (savedIds.data?.data[detail.id]?.length ?? 0) > 0 : false;
+
+  const updateNote = useUpdateNote(detail?.id ?? '');
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteSavedAt, setNoteSavedAt] = useState<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noteArticleId = useRef<string | null>(null);
+
+  // rascunho acompanha a nota do servidor quando o artigo muda; digitar depois
+  // disso nao e sobrescrito (o efeito so roda na troca de id)
+  useEffect(() => {
+    if (!detail) return;
+    if (noteArticleId.current === detail.id) return;
+    noteArticleId.current = detail.id;
+    setNoteDraft(detail.note ?? '');
+    setNoteSavedAt(null);
+  }, [detail]);
+
+  useEffect(
+    () => () => {
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+    },
+    [],
+  );
+
+  /** Grava a nota (debounce): string vazia limpa. */
+  function queueNoteSave(value: string) {
+    setNoteDraft(value);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(
+      () => {
+        // nada a fazer: mesmo valor ja gravado
+        if (value.trim() === (detail?.note ?? '').trim()) return;
+        updateNote.mutate(value, {
+          onSuccess: () =>
+            setNoteSavedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })),
+        });
+      },
+      NOTE_DEBOUNCE_MS,
+    );
+  }
 
   if (article.isPending) {
     return (
@@ -84,6 +133,47 @@ export function NewsDetailPage() {
           ) : (
             <p className="muted small">A fonte não disponibilizou o texto completo; resuma pelo link original.</p>
           )}
+
+          {isSaved ? (
+            <section className="note-panel" aria-label="Anotação pessoal">
+              <p className="note-panel__head">
+                <span className="note-panel__marker" aria-hidden="true">
+                  ✎
+                </span>
+                Anotação
+                <span className="spacer" />
+                {noteSavedAt ? (
+                  <span className="note-panel__status" role="status">
+                    salva às {noteSavedAt}
+                  </span>
+                ) : updateNote.isPending ? (
+                  <span className="note-panel__status" role="status">
+                    salvando…
+                  </span>
+                ) : null}
+              </p>
+              <textarea
+                className="note-panel__input"
+                value={noteDraft}
+                maxLength={NOTE_MAX_CHARS}
+                rows={4}
+                placeholder="Sua anotação sobre esta notícia — ela fica salva mesmo se você desfizer o salvamento."
+                onChange={(event) => queueNoteSave(event.target.value)}
+              />
+              <p className="note-panel__foot">
+                <span className="faint small">{noteDraft.length > 1800 ? `${noteDraft.length}/${NOTE_MAX_CHARS}` : 'salva automaticamente'}</span>
+                {noteDraft.trim() ? (
+                  <button
+                    type="button"
+                    className="button button--sm button--ghost"
+                    onClick={() => queueNoteSave('')}
+                  >
+                    Limpar
+                  </button>
+                ) : null}
+              </p>
+            </section>
+          ) : null}
 
           <p className="row" style={{ marginTop: 'var(--sp-5)' }}>
             <a className="button" href={data.url} target="_blank" rel="noopener noreferrer">

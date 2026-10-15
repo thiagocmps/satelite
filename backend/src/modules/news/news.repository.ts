@@ -25,7 +25,7 @@ const ARTICLE_JOINS = `
 
 const ARTICLE_COLUMNS = `
   a.id, a.title, a.description, a.image_url, a.author, a.url, a.published_at, a.ingested_at,
-  a.category_method, a.category_confidence,
+  a.category_method, a.category_confidence, a.note,
   s.id as source_id, s.slug as source_slug, s.name as source_name, s.site_url as source_site_url,
   c.id as category_id, c.slug as category_slug, c.name as category_name, c.color as category_color,
   sm.summary, sm.provider, sm.model, sm.prompt_version, sm.language as summary_language,
@@ -129,6 +129,7 @@ export const toArticle = (row: ArticleRow): Article => ({
       ? null
       : Number(row.category_confidence),
   summary: toSummary(row),
+  note: (row.note as string | null) ?? null,
 });
 
 /**

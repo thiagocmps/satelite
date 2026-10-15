@@ -53,6 +53,13 @@ export function buildCollectionMarkdown(group: NewsGroup, articles: Article[]): 
       lines.push(escapeMd(article.description));
       lines.push('');
     }
+    if (article.note) {
+      // marcador proprio, antes do link: o import para o bloco nele
+      lines.push('**Anotação:**');
+      lines.push('');
+      lines.push(escapeMd(article.note));
+      lines.push('');
+    }
     lines.push(`[Ler original](${article.url})`);
     lines.push('');
   }

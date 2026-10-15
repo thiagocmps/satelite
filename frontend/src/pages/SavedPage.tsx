@@ -98,7 +98,7 @@ export function SavedPage() {
     setPage(1);
   }
 
-  /** Lê o Markdown escolhido e manda pro backend (mesmo arranjo do import de fontes). */
+  /** Lê o arquivo escolhido (Markdown ou JSON) e manda pro backend. */
   function onImportFileSelected(file: File | undefined, input: HTMLInputElement) {
     // zera antes de ler: assim o mesmo arquivo pode ser escolhido de novo
     input.value = '';
@@ -158,7 +158,7 @@ export function SavedPage() {
             ref={fileInput}
             className="visually-hidden"
             type="file"
-            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json"
             onChange={(event) => onImportFileSelected(event.target.files?.[0], event.target)}
           />
           <button
@@ -166,15 +166,15 @@ export function SavedPage() {
             className="button collection-create__import"
             onClick={() => fileInput.current?.click()}
             disabled={importCollection.isPending}
-            title="Importar coleção de um arquivo Markdown — o mesmo formato do Exportar"
-            aria-label="Importar coleção de arquivo Markdown"
+            title="Importar coleção de um arquivo .md (leitura) ou .json (backup fiel) — o mesmo formato do Exportar"
+            aria-label="Importar coleção de arquivo Markdown ou JSON"
           >
             {importCollection.isPending ? (
               <>
                 <span className="spinner" aria-hidden="true" /> Importando…
               </>
             ) : (
-              '⇧ Importar .md'
+              '⇧ Importar .md/.json'
             )}
           </button>
         </form>
@@ -187,6 +187,9 @@ export function SavedPage() {
                 : `“${importResult.group.name}”: nada novo para importar.`}
             </strong>
             {importResult.already > 0 ? ` ${importResult.already} já estavam na coleção.` : ''}
+            {importResult.notesApplied > 0
+              ? ` ${importResult.notesApplied} anotação${importResult.notesApplied === 1 ? '' : 's'} gravada${importResult.notesApplied === 1 ? '' : 's'}.`
+              : ''}
             {importResult.notFound > 0 ? (
               <ul className="import-report__missing">
                 <li className="small">
@@ -302,11 +305,19 @@ export function SavedPage() {
                         </button>
                         <a
                           className="button button--sm button--ghost"
-                          href={exportGroupUrl(group.id)}
+                          href={exportGroupUrl(group.id, 'markdown')}
                           download
-                          title="Baixar esta coleção em Markdown"
+                          title="Baixar esta coleção em Markdown (leitura)"
                         >
-                          ↓ Exportar
+                          ↓ .md
+                        </a>
+                        <a
+                          className="button button--sm button--ghost"
+                          href={exportGroupUrl(group.id, 'json')}
+                          download
+                          title="Baixar esta coleção em JSON (backup fiel, com anotações)"
+                        >
+                          ↓ .json
                         </a>
                         <button
                           type="button"

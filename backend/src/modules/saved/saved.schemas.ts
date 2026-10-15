@@ -5,7 +5,11 @@ const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'use o formato #rr
 
 export const groupIdParamsSchema = z.object({ id: z.uuid() });
 export const savedParamsSchema = z.object({ id: z.uuid(), articleId: z.uuid() });
+export const articleIdParamsSchema = z.object({ articleId: z.uuid() });
 export const articleIdBodySchema = z.object({ articleId: z.uuid() });
+
+/** Anotacao pessoal da noticia. String vazia limpa a nota (vira null no banco). */
+export const noteBodySchema = z.object({ note: z.string().max(2000) });
 
 export const createGroupSchema = z.object({ name: groupName, color: hexColor });
 export const updateGroupSchema = z
