@@ -1,6 +1,7 @@
 import type { Env } from '../../config/env.js';
 import type { AiProvider } from './ai.provider.js';
 import { CompositeProvider } from './composite.provider.js';
+import { GroqProvider } from './groq.provider.js';
 import { OpenCodeProvider } from './opencode.provider.js';
 import { OpenRouterProvider } from './openrouter.provider.js';
 
@@ -31,6 +32,7 @@ export function createAiProvider(env: Env): AiProvider {
         classifyFallbackModels: env.AI_CLASSIFY_FALLBACK_MODELS,
         classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
         classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
+        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
       }),
     opencode: () =>
       new OpenCodeProvider({
@@ -46,6 +48,23 @@ export function createAiProvider(env: Env): AiProvider {
         classifyFallbackModels: env.OPENCODE_CLASSIFY_FALLBACK_MODELS,
         classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
         classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
+        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
+      }),
+    groq: () =>
+      new GroqProvider({
+        apiKey: env.GROQ_API_KEY,
+        baseUrl: env.GROQ_BASE_URL,
+        model: env.GROQ_MODEL,
+        fallbackModels: env.GROQ_FALLBACK_MODELS,
+        timeoutMs: env.AI_TIMEOUT_MS,
+        maxRetries: env.AI_MAX_RETRIES,
+        language: env.AI_LANGUAGE,
+        maxContentChars: env.AI_MAX_CONTENT_CHARS,
+        classifyModel: env.GROQ_CLASSIFY_MODEL,
+        classifyFallbackModels: env.GROQ_CLASSIFY_FALLBACK_MODELS,
+        classifyTimeoutMs: env.AI_CLASSIFY_TIMEOUT_MS,
+        classifyMaxRetries: env.AI_CLASSIFY_MAX_RETRIES,
+        classifyMaxContentChars: env.AI_CLASSIFY_MAX_CONTENT_CHARS,
       }),
   };
 

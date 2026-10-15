@@ -80,6 +80,16 @@ const schema = z
     AI_CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
     AI_CLASSIFY_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
     AI_CLASSIFY_MIN_TEXT_CHARS: z.coerce.number().int().min(0).default(120),
+    // Corte do conteudo SO no prompt de classificacao (resumos continuam em
+    // AI_MAX_CONTENT_CHARS). Planos gratuitos cobram por tokens/dia: payload
+    // enxuto = mais artigos por cota; titulo + descricao + lead bastam pra categoria.
+    // 0 = so titulo e descricao.
+    AI_CLASSIFY_MAX_CONTENT_CHARS: z.coerce.number().int().min(0).max(100_000).default(800),
+
+    // Classificacao periodica da fila needs_ai (sem depender do botao manual).
+    // ENABLE_CLASSIFY_SCHEDULER=false desliga so o agendador (o botao continua).
+    ENABLE_CLASSIFY_SCHEDULER: bool(true),
+    CLASSIFY_CRON: z.string().min(1).default('*/10 * * * *'),
 
     // Conteudo esportivo e descartado na ingestao (e sai da fila de IA).
     CONTENT_FILTER_SPORTS: bool(true),
@@ -87,9 +97,9 @@ const schema = z
     OPENROUTER_API_KEY: z.string().default(''),
     OPENROUTER_BASE_URL: url().default('https://openrouter.ai/api/v1'),
 
-    // Provedor OpenCode Zen (ai.registry.ts -> 'opencode'): gateway
-    // OpenAI-compativel com modelos gratuitos. "public" e a chave que o proprio
-    // gateway usa — sem credencial nem conta.
+    // Provedor OpenCode Zen (ai.registry.ts -> 'opencode'). Atencao: o free tier
+    // so aceita chamadas de dentro do app OpenCode — de fora responde 403
+    // FreeTierError (testado em 2026-10). Vale para uma Console key propria.
     OPENCODE_API_KEY: z.string().default('public'),
     OPENCODE_BASE_URL: url().default('https://opencode.ai/zen/v1'),
     OPENCODE_MODEL: z.string().min(1).default('space-bunny-free'),
@@ -97,6 +107,17 @@ const schema = z
     // Vazio = reusa OPENCODE_MODEL para classificar tambem.
     OPENCODE_CLASSIFY_MODEL: z.string().default(''),
     OPENCODE_CLASSIFY_FALLBACK_MODELS: csv(z.string().min(1)),
+
+    // Provedor Groq (ai.registry.ts -> 'groq'): OpenAI-compativel com plano
+    // gratuito por organizacao (RPM/RPD/TPM/TPD; saldo visivel nos headers
+    // x-ratelimit-* de cada resposta). Chave em https://console.groq.com/keys.
+    GROQ_API_KEY: z.string().default(''),
+    GROQ_BASE_URL: url().default('https://api.groq.com/openai/v1'),
+    GROQ_MODEL: z.string().min(1).default('qwen/qwen3.8-27b'),
+    GROQ_FALLBACK_MODELS: csv(z.string().min(1)),
+    // Vazio = reusa GROQ_MODEL para classificar tambem.
+    GROQ_CLASSIFY_MODEL: z.string().default(''),
+    GROQ_CLASSIFY_FALLBACK_MODELS: csv(z.string().min(1)),
   })
   .superRefine((env, ctx) => {
     const usesOpenRouter = [env.AI_PROVIDER, ...env.AI_FALLBACK_PROVIDERS].includes('openrouter');
@@ -106,6 +127,14 @@ const schema = z
         path: ['OPENROUTER_API_KEY'],
         message:
           'obrigatorio quando AI_PROVIDER ou AI_FALLBACK_PROVIDERS usa openrouter (https://openrouter.ai/keys)',
+      });
+    }
+    const usesGroq = [env.AI_PROVIDER, ...env.AI_FALLBACK_PROVIDERS].includes('groq');
+    if (usesGroq && !env.GROQ_API_KEY.trim()) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GROQ_API_KEY'],
+        message: 'obrigatorio quando AI_PROVIDER ou AI_FALLBACK_PROVIDERS usa groq (https://console.groq.com/keys)',
       });
     }
   });

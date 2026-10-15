@@ -36,6 +36,12 @@ export type OpenAICompatibleConfig = {
   classifyFallbackModels: string[];
   classifyTimeoutMs: number;
   classifyMaxRetries: number;
+  /**
+   * Classificacao: corte proprio do conteudo no prompt. O plano gratuito cobra
+   * por tokens/dia, e titulo + descricao + lead ja bastam pra categoria —
+   * undefined = usa `maxContentChars` (o corte dos resumos).
+   */
+  classifyMaxContentChars?: number;
 };
 
 /** Erro do provedor que carrega Retry-After para orientar o backoff. */
@@ -178,7 +184,10 @@ export class OpenAICompatibleProvider implements AiProvider {
   #classifyBody(model: string, input: ClassifyInput): ChatRequestBody {
     return {
       model,
-      messages: buildClassifyMessages(input, { language: this.config.language, maxContentChars: this.config.maxContentChars }),
+      messages: buildClassifyMessages(input, {
+        language: this.config.language,
+        maxContentChars: this.config.classifyMaxContentChars ?? this.config.maxContentChars,
+      }),
       temperature: 0,
       // JSON estrito: o modelo deve responder somente com o objeto de classificacao
       response_format: { type: 'json_object' },
@@ -190,7 +199,7 @@ export class OpenAICompatibleProvider implements AiProvider {
       model,
       messages: buildClassifyBatchMessages(inputs, {
         language: this.config.language,
-        maxContentChars: this.config.maxContentChars,
+        maxContentChars: this.config.classifyMaxContentChars ?? this.config.maxContentChars,
       }),
       temperature: 0,
       response_format: { type: 'json_object' },

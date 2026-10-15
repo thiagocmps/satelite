@@ -119,14 +119,15 @@ exporta os termos para gerar SQL de limpeza a partir da MESMA fonte unica (veja 
 `sports-block.test.ts` com casos de falso positivo.
 
 `classification.service.ts` processa a fila: quem a regra decide sai sem custo de modelo; texto curto
-demais fica como esta; esporte sai sem custo; o resto vai para a IA (OpenRouter, `classify` com
+demais fica como esta; esporte sai sem custo; o resto vai para a IA (Groq, `classify` com
 `response_format: json_object`) com o catalogo real de categorias (slug + nome) e o prompt
 few-shot que manda **o titulo decidir**, **esporte → nenhuma categoria** e **duvida → nenhuma**.
 O modelo responde `{"categorySlug", "confidence"}`; slug fora do catalogo ou confianca abaixo de
 `AI_CLASSIFY_MIN_CONFIDENCE` (0.6) nao aplica categoria. O veredito grava `category_method`
 (`'keyword'`/`'ai'`) e `category_confidence` direto em `articles`. Falha de IA mantem `needs_ai`
-para a proxima rodada; 429 aborta a rodada (cota gratuita = 50 req/dia). Dispare
-`POST /ingest/classify` (ou o botao em Fontes).
+para a proxima rodada; 429 aborta a rodada (cota gratuita Groq = 1000 req/dia, 200K tokens/dia).
+A fila drena sozinha a cada `CLASSIFY_CRON` (agendador, ver §10); `POST /ingest/classify` e o botao
+em Fontes seguem como acao manual.
 
 ### 6. Persistência e leitura
 
@@ -196,20 +197,21 @@ regenerados no próximo clique, sem apagar o histórico.
 ### Chamada
 
 `backend/src/integrations/ai/openai-compatible.provider.ts` (base compartilhada; as variações
-ficam em `openrouter.provider.ts` e `opencode.provider.ts`)
+ficam em `openrouter.provider.ts`, `groq.provider.ts` e `opencode.provider.ts`)
 
 ```http
-POST https://openrouter.ai/api/v1/chat/completions
-Authorization: Bearer $OPENROUTER_API_KEY
-HTTP-Referer: $APP_URL
-X-Title: $APP_NAME
+POST https://api.groq.com/openai/v1/chat/completions
+Authorization: Bearer $GROQ_API_KEY
 
-{ "model": "openrouter/free", "messages": [...], "temperature": 0.3 }
+{ "model": "qwen/qwen3.8-27b", "messages": [...], "temperature": 0.3 }
 ```
 
-No OpenCode Zen (`https://opencode.ai/zen/v1`), a mesma chamada usa `Authorization: Bearer public`
-e `"model": "space-bunny-free"` — o `OpenCodeProvider` reusa o pedaço OpenAI-compatível inteiro.
-Na classificação o body ganha `"response_format": { "type": "json_object" }` e `temperature: 0`.
+No OpenRouter (`https://openrouter.ai/api/v1`) a mesma chamada usa `Authorization: Bearer
+$OPENROUTER_API_KEY`, `HTTP-Referer`/`X-Title` e `"model": "openrouter/free"`. No OpenCode Zen
+(`https://opencode.ai/zen/v1`) usaria `Bearer public` e `"model": "space-bunny-free"` — mas o free
+tier recusa chamadas de fora do app (403 `FreeTierError`), entao hoje o registro so serve com uma
+Console key propria. Na classificacao o body ganha `"response_format": { "type": "json_object" }`,
+`temperature: 0` e o conteudo e cortado em `AI_CLASSIFY_MAX_CONTENT_CHARS` (800).
 
 Ordem das tentativas: modelo principal (`AI_MAX_RETRIES` vezes em 429/5xx, honrando `Retry-After`),
 depois cada modelo de `AI_FALLBACK_MODELS`. Erro mapeado para `AI_AUTH_INVALID`, `AI_QUOTA`,
@@ -256,10 +258,12 @@ cd backend && npx vitest run -t "dedup"          # por nome
 | `core/html.test.ts`                                  | limpeza de HTML, entidades, CDATA                        |
 | `integrations/rss/rss.normalize.test.ts`             | imagens, autores, datas, feeds incompletos               |
 | `integrations/ai/openrouter.provider.test.ts`        | retry, fallback, mapeamento de erro, cache, classify     |
+| `integrations/ai/groq.provider.test.ts`              | endpoint/chave do Groq, payload enxuto de classify, fallback de modelo |
 | `integrations/ai/opencode.provider.test.ts`          | endpoint/chave do Zen, JSON estrito, fallback de modelo  |
 | `integrations/ai/composite.provider.test.ts`         | cadeia: failover em cota/429/5xx/timeout; sem troca em credencial; relança o último erro |
-| `integrations/ai/ai.registry.test.ts`                | montagem da cadeia, validação de `OPENROUTER_API_KEY` no fallback |
+| `integrations/ai/ai.registry.test.ts`                | montagem da cadeia, validação das chaves (OpenRouter/Groq) no fallback |
 | `integrations/ai/ai.classify.test.ts`                | prompt do catalogo, parsing e allowlist de slugs         |
+| `scheduler/classification.scheduler.test.ts`         | agendador: tick, fila em andamento, enables, cron invalido |
 | `modules/classification/keyword-engine.test.ts`      | regras, acento, borda de palavra, ambiguidade            |
 | `modules/classification/classification.service.test.ts` | fila: keyword sem custo, IA na duvida, falha pendente |
 | `modules/ingestion/ingestion.service.test.ts`        | dedup, contagens, fonte que falha não derruba as outras   |

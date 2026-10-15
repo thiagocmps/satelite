@@ -153,9 +153,9 @@ multifonte o título é o argumento mais confiável), **esporte → não escolhe
 `AI_CLASSIFY_MIN_CONFIDENCE` (0.6) não aplica categoria, e tudo grava `category_method`/`category_confidence`
 em `articles`.
 
-**Cota e fallback de provedor:** a rodada aborta no primeiro 429 **geral** (cota OpenRouter gratuita
-= 50 req/dia). Com `AI_FALLBACK_PROVIDERS` (ex.: `opencode`, o OpenCode Zen, modelo gratuito)
-o abort só dispara quando **toda a cadeia** falha — o 429 do OpenRouter vira tentativa no Zen, e a
+**Cota e fallback de provedor:** a rodada aborta no primeiro 429 **geral** (cota do plano gratuito
+do Groq = 1000 req/dia e 200K tokens/dia). Com `AI_FALLBACK_PROVIDERS` (hoje `openrouter`, free)
+o abort só dispara quando **toda a cadeia** falha — o 429 do Groq vira tentativa no OpenRouter, e a
 fila continua andando sem esperar o reset diário (ver §9).
 
 ### 8. Resumo por IA sob demanda, cacheado
@@ -192,11 +192,11 @@ interface AiProvider {
 }
 ```
 
-A maioria dos gateways fala uma API compatível com OpenAI `/chat/completions` (OpenRouter e o
-OpenCode Zen são dois exemplos). Por isso a implementação é uma classe única,
+A maioria dos gateways fala uma API compatível com OpenAI `/chat/completions` (OpenRouter, Groq e o
+OpenCode Zen são três exemplos). Por isso a implementação é uma classe única,
 `OpenAICompatibleProvider` em `integrations/ai/openai-compatible.provider.ts`, que recebe por
 configuração o que muda entre eles: `name`, chave, endpoint, modelo e o comportamento da
-classificação. Os registros `openrouter` e `opencode` são subclasses de uma linha — nada de SDK.
+classificação. Os registros `openrouter`, `groq` e `opencode` são subclasses de uma linha — nada de SDK.
 
 Robustez, toda dentro do provider:
 
@@ -205,7 +205,9 @@ Robustez, toda dentro do provider:
 - Em seguida, tentativa no próximo modelo de `AI_FALLBACK_MODELS`.
 - Mapeamento de erro para códigos estáveis: `AI_AUTH_INVALID` (401/403), `AI_QUOTA` (402),
   `AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR` (5xx/gateway fora), `AI_BAD_RESPONSE` (resposta vazia
-  ou sem conteúdo).
+  ou sem conteúdo). Cada provedor tem ainda um corte próprio de conteúdo na classificação
+(`AI_CLASSIFY_MAX_CONTENT_CHARS`, 800 por padrão): título + descrição + lead bastam pra categoria,
+e payload enxuto é o que faz a cota diária de tokens dos planos gratuitos render.
 
 **Fallback entre provedores (`CompositeProvider`).** `ai.registry.ts` resolve `AI_PROVIDER` como
 principal e `AI_FALLBACK_PROVIDERS` como cadeia: com mais de um, devolve um `CompositeProvider` que
@@ -214,18 +216,26 @@ falhas que outro gateway resolveria — `AI_QUOTA` (cota zerada, o caso de uso d
 `AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR`, gateway fora e timeout. Erro de **credencial**
 (`AI_AUTH_INVALID`) e resposta **ilegível** (`AI_BAD_RESPONSE`) não trocam de provedor: repetir com
 outra chave resolve pouco, e texto ruim não melhora. Como o fallback devolve o resultado do provedor
-que respondeu, o `provider` real fica gravado no banco (`openrouter` ou `opencode`), e o circuito do
-classificador continua sendo o abort no primeiro 429 — porém só quando a cadeia inteira falhou (§7).
+que respondeu, o `provider` real fica gravado no banco (`groq`, `openrouter` ou `opencode`), e o
+circuito do classificador continua sendo o abort no primeiro 429 — porém só quando a cadeia inteira
+falhou (§7).
 
 A integração usa `fetch` nativo, sem SDK: o contrato é uma requisição JSON documentada, e um SDK
-seria só mais uma dependência para acompanhar. O Zen não cobra nada por `space-bunny-free`
-(`Authorization: Bearer public`, chave pública do próprio gateway), então o fallback é grátis por
-construção — não depende de conta nem de saldo.
+seria só mais uma dependência para acompanhar. O Groq tem plano gratuito por organização (1000
+req/dia, 8K tokens/min, 200K tokens/dia em `qwen/qwen3.8-27b`; o saldo real aparece nos headers
+`x-ratelimit-*` de cada resposta), então a cadeia atual `groq → openrouter (free)` é $0 por
+construção. O OpenCode Zen (`space-bunny-free`), apesar de listado como grátis, recusa chamadas de
+fora do app com 403 `FreeTierError` — o registro permanece para uma Console key própria.
 
 ### 10. Agendador in-process
 
-`node-cron` roda a coleta a cada `INGEST_CRON`, com `noOverlap` para não empilhar execuções se uma
-demorar mais que o intervalo. `ENABLE_INGEST=false` desliga.
+`node-cron` roda **dois** trabalhos in-process, ambos com `noOverlap` para não empilhar execuções
+se uma demorar mais que o intervalo:
+
+- coleta (`INGEST_CRON`, `*/15` por padrão) — desliga com `ENABLE_INGEST=false`;
+- classificação da fila `needs_ai` (`CLASSIFY_CRON`, `*/10` por padrão) — desliga com
+  `ENABLE_CLASSIFY_SCHEDULER=false`. A fila vazia vira um ciclo que não faz nenhuma chamada de IA,
+  então o agendador é ocioso de graça; o botão manual em Fontes continua disponível.
 
 **Alternativa descartada:** fila (BullMQ/Redis). Uma fila real traz retry com backoff, DLQ e
 distribuição — nenhum dos quais é necessário enquanto a coleta é um `Promise.allSettled` sobre 9
