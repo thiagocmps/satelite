@@ -174,7 +174,7 @@ export function NewsDetailPage() {
                 className="note-panel__input"
                 value={noteDraft}
                 maxLength={NOTE_MAX_CHARS}
-                rows={4}
+                rows={8}
                 placeholder="Sua anotação sobre esta notícia — ela fica salva mesmo se você desfizer o salvamento."
                 onChange={(event) => queueNoteSave(event.target.value)}
               />
