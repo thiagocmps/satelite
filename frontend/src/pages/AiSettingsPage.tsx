@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AiSettings, AiSettingsPatch, AiSettingsView, SettingsField } from '../api/types';
+import type { AiSettings, AiSettingsPatch, AiSettingsView, ClassificationReport, SettingsField } from '../api/types';
 import { PageHeader } from '../components/PageHeader';
 import { ErrorBox } from '../components/States';
 import {
@@ -218,7 +218,8 @@ export function AiSettingsPage() {
   const settings = useAiSettings();
   const status = useClassificationStatus();
   const update = useUpdateAiSettings();
-  const run = useRunClassification();
+  const [classifyResult, setClassifyResult] = useState<ClassificationReport | null>(null);
+  const run = useRunClassification(setClassifyResult);
   const [draft, setDraft] = useState<AiSettings | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -329,14 +330,32 @@ export function AiSettingsPage() {
           <button
             className="button button--primary"
             onClick={() => run.mutate()}
-            disabled={run.isPending}
+            disabled={run.isPending || pending === 0}
+            title={
+              pending > 0
+                ? `${pending} artigo${pending > 1 ? 's' : ''} esperando a IA`
+                : 'Nenhum artigo na fila de classificação'
+            }
           >
-            {run.isPending ? 'Classificando…' : '✦ Classificar agora'}
+            {run.isPending ? 'Classificando…' : `✦ Classificar agora${pending > 0 ? ` (${pending})` : ''}`}
           </button>
         }
       />
 
       {run.isError ? <ErrorBox message={run.error.message} /> : null}
+      {classifyResult ? (
+        <p className="toast toast--ok" role="status">
+          Classificação concluída:{' '}
+          <strong>
+            {classifyResult.processed} artigo{classifyResult.processed === 1 ? '' : 's'} processado
+            {classifyResult.processed === 1 ? '' : 's'}
+          </strong>
+          {classifyResult.aiAssigned > 0 && `, ${classifyResult.aiAssigned} por IA`}
+          {classifyResult.resolvedKeyword > 0 && `, ${classifyResult.resolvedKeyword} por regra`}
+          {classifyResult.errors > 0 && `, ${classifyResult.errors} com erro`}
+          {classifyResult.pending > 0 ? ` (${classifyResult.pending} ainda na fila)` : '.'}
+        </p>
+      ) : null}
 
       <div className="stat-tiles">
         <div className="stat-tile">

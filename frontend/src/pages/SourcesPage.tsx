@@ -3,16 +3,14 @@ import type { FormEvent } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState, ErrorBox } from '../components/States';
 import { suggestSlug } from '../components/Filters';
-import type { ClassificationReport, SourcesImportReport } from '../api/types';
+import type { SourcesImportReport } from '../api/types';
 import {
   useCategories,
-  useClassificationStatus,
   useCreateSource,
   useDeleteSource,
   useImportSources,
   useIngestNow,
   useIngestionRuns,
-  useRunClassification,
   useSources,
   useUpdateSource,
 } from '../hooks/useSatelite';
@@ -34,18 +32,13 @@ export function SourcesPage() {
   const deleteSource = useDeleteSource();
   const ingest = useIngestNow();
   const importSources = useImportSources();
-  const classifyStatus = useClassificationStatus();
-  const [classifyResult, setClassifyResult] = useState<ClassificationReport | null>(null);
-  const classify = useRunClassification(setClassifyResult);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({ name: '', slug: '', feedUrl: '', siteUrl: '', categoryId: '' });
   const [importResult, setImportResult] = useState<SourcesImportReport | null>(null);
 
   const error =
-    sources.error ?? createSource.error ?? ingest.error ?? deleteSource.error ?? importSources.error ?? classify.error;
-
-  const pendingClassification = classifyStatus.data?.data.pending ?? 0;
+    sources.error ?? createSource.error ?? ingest.error ?? deleteSource.error ?? importSources.error;
 
   function onImportFileSelected(file: File | undefined) {
     if (!file) return;
@@ -129,25 +122,6 @@ export function SourcesPage() {
                 '⟳ Ingerir tudo'
               )}
             </button>
-            <button
-              type="button"
-              className="button"
-              onClick={() => classify.mutate()}
-              disabled={classify.isPending || pendingClassification === 0}
-              title={
-                pendingClassification > 0
-                  ? `${pendingClassification} artigo${pendingClassification > 1 ? 's' : ''} esperando a IA`
-                  : 'Nenhum artigo na fila de classificação'
-              }
-            >
-              {classify.isPending ? (
-                <>
-                  <span className="spinner" aria-hidden="true" /> Classificando…
-                </>
-              ) : (
-                <>✦ Classificar pendentes{pendingClassification > 0 ? ` (${pendingClassification})` : ''}</>
-              )}
-            </button>
           </>
         }
       />
@@ -156,19 +130,6 @@ export function SourcesPage() {
       {ingest.isSuccess ? (
         <p className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }}>
           Ingestão concluída. Vá em Notícias para ver os resultados.
-        </p>
-      ) : null}
-      {classifyResult ? (
-        <p className="toast toast--ok" style={{ marginBottom: 'var(--sp-4)' }} role="status">
-          Classificação concluída:{' '}
-          <strong>
-            {classifyResult.processed} artigo{classifyResult.processed === 1 ? '' : 's'} processado
-            {classifyResult.processed === 1 ? '' : 's'}
-          </strong>
-          {classifyResult.aiAssigned > 0 && `, ${classifyResult.aiAssigned} por IA`}
-          {classifyResult.resolvedKeyword > 0 && `, ${classifyResult.resolvedKeyword} por regra`}
-          {classifyResult.errors > 0 && `, ${classifyResult.errors} com erro`}
-          {classifyResult.pending > 0 ? ` (${classifyResult.pending} ainda na fila)` : '.'}
         </p>
       ) : null}
 

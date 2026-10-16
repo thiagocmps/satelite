@@ -28,10 +28,13 @@ export class PgClassificationRepository implements ClassificationRepository {
 
   async listPending(limit: number): Promise<PendingArticle[]> {
     const { rows } = await this.db.query(
+      // Mais recentes primeiro: como agregador de noticia, categorizar o que
+      // acabou de chegar vale mais; o que sobrar (fila antiga) drena depois.
+      // ingested_at desc cai direto no articles_ingested_at_idx.
       `select id, title, description, content, category_id
          from articles
         where needs_ai
-        order by ingested_at asc
+        order by ingested_at desc
         limit $1`,
       [limit],
     );

@@ -4,7 +4,7 @@ import type { Container } from '../container.js';
 
 /**
  * Classificacao periodica da fila `needs_ai`. Sem ela, novos artigos so saem da
- * fila no clique do botao "Classificar pendentes" (SourcesPage); com ela, a
+ * fila no clique do botao "Classificar agora" (tela /config-ia); com ela, a
  * fila drena sozinha. Fila vazia = ciclo nao faz nenhuma chamada de IA.
  *
  * Cadencia e on/off vem da CONFIGURACAO EM RUNTIME (tela /config-ia): o
