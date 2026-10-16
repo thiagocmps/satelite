@@ -38,7 +38,7 @@ export function SummaryPanel({ articleId }: { articleId: string }) {
         <p className="small muted">Não foi possível consultar o resumo salvo.</p>
       ) : (
         <p className="small muted">
-          Nenhum resumo gerado para esta notícia ainda. A geração consome a cota gratuita da OpenRouter, então
+          Nenhum resumo gerado para esta notícia ainda. A geração consome a cota do plano gratuito de IA, então
           o resumo é gerado sob demanda.
         </p>
       )}

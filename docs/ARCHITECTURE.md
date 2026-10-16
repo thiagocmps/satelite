@@ -22,12 +22,12 @@ artefato estático.
 ```
 fonte RSS ──GET condicional──> rss.adapter ──parse──> rss.normalize ──> articles (PG)
                                     │                       │
-                                    │                       └── keyword-engine (regras) ──> IA (OpenRouter, só na dúvida) ──> articles
+                                    │                       └── keyword-engine (regras) ──> IA (Groq, só na dúvida) ──> articles
                                     └── ingestion_runs (saúde por execução)
                                                                         │
 articles (PG) ──GET /news──> API ──proxy /api──> nginx ──> React ──clique──> POST /news/:id/summary
                                                                         │
-                                                        OpenRouter ──────┘ (ai_summaries)
+                                                        Groq ──────────┘ (ai_summaries)
 ```
 
 ## Decisões
@@ -154,9 +154,10 @@ multifonte o título é o argumento mais confiável), **esporte → não escolhe
 em `articles`.
 
 **Cota e fallback de provedor:** a rodada aborta no primeiro 429 **geral** (cota do plano gratuito
-do Groq = 1000 req/dia e 200K tokens/dia). Com `AI_FALLBACK_PROVIDERS` (hoje `openrouter`, free)
-o abort só dispara quando **toda a cadeia** falha — o 429 do Groq vira tentativa no OpenRouter, e a
-fila continua andando sem esperar o reset diário (ver §9).
+do Groq = 1000 req/dia, 8K tokens/min e 200K tokens/dia em `qwen/qwen3.8-27b`). Hoje a cadeia é
+**groq-only** (`AI_FALLBACK_PROVIDERS` vazio), então o 429 do Groq aborta direto a rodada e os artigos
+ficam pendentes até a janela liberar. Se `AI_FALLBACK_PROVIDERS` incluir `openrouter` (requer crédito),
+o abort só dispara quando **toda a cadeia** falha — o 429 do Groq vira tentativa no OpenRouter (ver §9).
 
 ### 8. Resumo por IA sob demanda, cacheado
 
@@ -206,7 +207,7 @@ Robustez, toda dentro do provider:
 - Mapeamento de erro para códigos estáveis: `AI_AUTH_INVALID` (401/403), `AI_QUOTA` (402),
   `AI_RATE_LIMIT` (429), `AI_UPSTREAM_ERROR` (5xx/gateway fora), `AI_BAD_RESPONSE` (resposta vazia
   ou sem conteúdo). Cada provedor tem ainda um corte próprio de conteúdo na classificação
-(`AI_CLASSIFY_MAX_CONTENT_CHARS`, 800 por padrão): título + descrição + lead bastam pra categoria,
+(`AI_CLASSIFY_MAX_CONTENT_CHARS`, 350 por padrão): título + descrição + lead bastam pra categoria,
 e payload enxuto é o que faz a cota diária de tokens dos planos gratuitos render.
 
 **Fallback entre provedores (`CompositeProvider`).** `ai.registry.ts` resolve `AI_PROVIDER` como
@@ -223,9 +224,9 @@ falhou (§7).
 A integração usa `fetch` nativo, sem SDK: o contrato é uma requisição JSON documentada, e um SDK
 seria só mais uma dependência para acompanhar. O Groq tem plano gratuito por organização (1000
 req/dia, 8K tokens/min, 200K tokens/dia em `qwen/qwen3.8-27b`; o saldo real aparece nos headers
-`x-ratelimit-*` de cada resposta), então a cadeia atual `groq → openrouter (free)` é $0 por
-construção. O OpenCode Zen (`space-bunny-free`), apesar de listado como grátis, recusa chamadas de
-fora do app com 403 `FreeTierError` — o registro permanece para uma Console key própria.
+`x-ratelimit-*` de cada resposta), então a cadeia atual **groq-only** é $0 por construção. O OpenCode
+Zen (`space-bunny-free`), apesar de listado como grátis, recusa chamadas de fora do app com 403
+`FreeTierError` — o registro permanece para uma Console key própria.
 
 ### 10. Agendador in-process
 

@@ -13,7 +13,11 @@ const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Lo
 /** Ajustes de IA falsos: defaults do .env com overrides pontuais por teste. */
 const settingsSource = (classify: Partial<AiSettings['classify']> = {}): AiSettingsSource => {
   const base = aiDefaults(
-    loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+    loadEnv({
+      DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite',
+      AI_PROVIDER: 'openrouter',
+      OPENROUTER_API_KEY: 'sk-or-teste',
+    }),
   );
   return { ai: () => ({ ...base, classify: { ...base.classify, ...classify } }) };
 };

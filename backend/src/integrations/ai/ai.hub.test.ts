@@ -16,7 +16,11 @@ import type {
 } from './ai.provider.js';
 
 const base = aiDefaults(
-  loadEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite', OPENROUTER_API_KEY: 'sk-or-teste' }),
+  loadEnv({
+    DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite',
+    AI_PROVIDER: 'openrouter',
+    OPENROUTER_API_KEY: 'sk-or-teste',
+  }),
 );
 
 /** providers e Record: sempre perguntar com fallback (noUncheckedIndexedAccess). */

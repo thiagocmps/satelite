@@ -10,6 +10,9 @@ import { OpenRouterProvider } from './openrouter.provider.js';
 const env = (overrides: Record<string, string> = {}) =>
   loadEnv({
     DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite',
+    // estes testes exercitam o MECANISMO de resolucao de provedor; fixamos o
+    // principal aqui para nao depender do default do .env (que e groq).
+    AI_PROVIDER: 'openrouter',
     OPENROUTER_API_KEY: 'sk-or-teste',
     ...overrides,
   });

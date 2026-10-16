@@ -10,6 +10,9 @@ import type { AiSettingsPatch } from './settings.types.js';
 const env = () =>
   loadEnv({
     DATABASE_URL: 'postgres://user:pass@localhost:5432/satelite',
+    // fixamos o principal aqui: estes testes exercitam o mecanismo de
+    // defaults/overrides do SettingsService, nao qual provider e o default.
+    AI_PROVIDER: 'openrouter',
     OPENROUTER_API_KEY: 'sk-or-teste-abcdef',
   });
 

@@ -8,6 +8,9 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 
 process.env.DATABASE_URL ??= 'postgres://satelite:satelite@localhost:5432/satelite';
+// fixamos o principal aqui: o default do .env e groq, mas estes testes exercitam
+// as rotas e supoem openrouter como provedor ativo.
+process.env.AI_PROVIDER ??= 'openrouter';
 process.env.OPENROUTER_API_KEY ??= 'sk-or-teste';
 process.env.ENABLE_INGEST = 'false';
 process.env.NODE_ENV = 'test';

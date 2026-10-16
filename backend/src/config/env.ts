@@ -55,7 +55,8 @@ const schema = z
     INGEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(20_000),
     FEED_MAX_BYTES: z.coerce.number().int().min(10_000).default(8_000_000),
 
-    AI_PROVIDER: z.string().min(1).default('openrouter'),
+    // Groq e o provedor que funciona no plano gratuito (chat free util em pt-BR).
+    AI_PROVIDER: z.string().min(1).default('groq'),
     // Alternativas registradas em ai.registry.ts, tentadas em sequencia quando o
     // principal falha (cota zerada, 429, 5xx, gateway fora, timeout).
     AI_FALLBACK_PROVIDERS: csv(z.string().min(1)),
@@ -77,14 +78,16 @@ const schema = z
     AI_CLASSIFY_BATCH: z.coerce.number().int().min(1).max(500).default(25),
     // Artigos por requisicao de IA (lote). 1 = comportamento antigo, uma chamada por noticia.
     AI_CLASSIFY_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(8),
-    AI_CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
+    // 1 = chamadas sequenciais. Groq free tem 8K tokens/min (TPM): concorrência
+    // maior dispara 429 em rajada (cada lote de classify já custa ~2-3K tokens).
+    AI_CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(1),
     AI_CLASSIFY_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.6),
     AI_CLASSIFY_MIN_TEXT_CHARS: z.coerce.number().int().min(0).default(120),
     // Corte do conteudo SO no prompt de classificacao (resumos continuam em
-    // AI_MAX_CONTENT_CHARS). Planos gratuitos cobram por tokens/dia: payload
-    // enxuto = mais artigos por cota; titulo + descricao + lead bastam pra categoria.
-    // 0 = so titulo e descricao.
-    AI_CLASSIFY_MAX_CONTENT_CHARS: z.coerce.number().int().min(0).max(100_000).default(800),
+    // AI_MAX_CONTENT_CHARS). Groq free cobra tokens/DIA (TPD 200K): payload
+    // enxuto = mais artigos por cota; titulo e a fonte primaria da decisao, o
+    // texto (lead) e so apoio. 0 = so titulo e descricao.
+    AI_CLASSIFY_MAX_CONTENT_CHARS: z.coerce.number().int().min(0).max(100_000).default(350),
 
     // Classificacao periodica da fila needs_ai (sem depender do botao manual).
     // ENABLE_CLASSIFY_SCHEDULER=false desliga so o agendador (o botao continua).

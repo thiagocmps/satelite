@@ -12,7 +12,7 @@ Cada etapa abaixo aponta o arquivo exato. As decisões por trás estão em
 ## 0. Rodando
 
 ```bash
-cp .env.example .env        # ajuste OPENROUTER_API_KEY
+cp .env.example .env        # ajuste GROQ_API_KEY
 docker compose up --build   # frontend :8080 · API :4000 · Postgres :5433
 ```
 

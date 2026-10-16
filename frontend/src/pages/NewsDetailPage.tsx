@@ -97,7 +97,7 @@ export function NewsDetailPage() {
                 <strong>{data.source.name}</strong>
                 {data.category ? <span className="badge badge--category">{data.category.name}</span> : null}
                 {data.categoryMethod === 'ai' ? (
-                  <span className="faint small" title="Categoria atribuída por IA (OpenRouter)">
+                  <span className="faint small" title="Categoria atribuída por IA">
                     por IA{' '}
                     {data.categoryConfidence != null ? `${Math.round(data.categoryConfidence * 100)}% de confiança` : ''}
                   </span>

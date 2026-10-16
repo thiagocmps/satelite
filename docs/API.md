@@ -42,9 +42,9 @@ requisição.
 | `TIMEOUT`            | 504    | Timeout na coleta do feed ou na chamada de IA                    |
 | `FEED_HTTP_ERROR`    | 502    | Feed respondeu com status não-2xx                                 |
 | `FEED_INVALID_XML`   | 502    | Corpo do feed não é XML válido                                   |
-| `AI_AUTH_INVALID`    | 502    | OpenRouter recusou a credencial (401)                             |
-| `AI_QUOTA`           | 502    | Sem cota na OpenRouter (402)                                     |
-| `AI_RATE_LIMIT`      | 502    | OpenRouter aplicou rate limit (429) mesmo após todas as tentativas |
+| `AI_AUTH_INVALID`    | 502    | O provedor recusou a credencial (401/403)                        |
+| `AI_QUOTA`           | 502    | Sem cota no provedor (402)                                       |
+| `AI_RATE_LIMIT`      | 502    | O provedor aplicou rate limit (429) mesmo após todas as tentativas |
 | `AI_UPSTREAM_ERROR`  | 502    | Gateway fora do ar (5xx) ou timeout                              |
 | `AI_BAD_RESPONSE`    | 502    | Resposta sem conteúdo utilizável                                  |
 | `UPSTREAM_UNREACHABLE` | 502  | Falha de rede ao buscar o feed                                    |
@@ -184,8 +184,8 @@ Quando existe:
   "data": {
     "text": "Resgate de duas páginas, com seis feridos…",
     "generatedByAi": true,
-    "provider": "openrouter",
-    "model": "openrouter/free",
+    "provider": "groq",
+    "model": "qwen/qwen3.8-27b",
     "promptVersion": "v1",
     "language": "pt-BR",
     "createdAt": "2026-09-28T18:20:11.004Z",
@@ -217,8 +217,8 @@ curl -X POST http://localhost:4000/api/v1/news/$ID/summary
     "text": "…",
     "generatedByAi": true,
     "cached": false,
-    "provider": "openrouter",
-    "model": "openrouter/free",
+    "provider": "groq",
+    "model": "qwen/qwen3.8-27b",
     "promptVersion": "v1",
     "language": "pt-BR",
     "createdAt": "2026-09-28T18:20:11.004Z",
@@ -504,7 +504,7 @@ Histórico, mais recente primeiro.
 ## Classificação por IA
 
 Camada explicável sobre a keyword: a regra determinística continua decidindo
-primeiro (e sempre), e a IA (OpenRouter) só entra quando a keyword é **ambígua**
+primeiro (e sempre), e a IA (Groq) só entra quando a keyword é **ambígua**
 (≥ 2 categorias) ou **ausente**, com texto de pelo menos
 `AI_CLASSIFY_MIN_TEXT_CHARS` caracteres. O veredito da IA é gravado direto em
 `articles.category_id` com `category_method = 'ai'` e a confiança em
@@ -566,23 +566,23 @@ reagendado na hora. Chaves nunca aparecem em claro: o GET devolve `••••`
   "data": {
     "settings": {
       "provider": "groq",
-      "fallbackProviders": ["openrouter"],
+      "fallbackProviders": [],
       "providers": {
         "groq": {
           "apiKey": "••••sUE3",
           "baseUrl": "https://api.groq.com/openai/v1",
           "model": "qwen/qwen3.8-27b",
           "fallbackModels": [],
-          "classifyModel": "qwen/qwen3.8-27b",
+          "classifyModel": "",
           "classifyFallbackModels": []
         }
       },
       "classify": {
-        "enabled": true, "timeoutMs": 60000, "maxRetries": 2, "batch": 100,
-        "batchSize": 100, "concurrency": 3, "minConfidence": 0.6,
-        "minTextChars": 200, "maxContentChars": 800
+        "enabled": true, "timeoutMs": 45000, "maxRetries": 2, "batch": 100,
+        "batchSize": 8, "concurrency": 1, "minConfidence": 0.6,
+        "minTextChars": 120, "maxContentChars": 350
       },
-      "summarize": { "language": "pt-BR", "timeoutMs": 120000, "maxRetries": 3, "maxContentChars": 4000 },
+      "summarize": { "language": "pt-BR", "timeoutMs": 45000, "maxRetries": 2, "maxContentChars": 4000 },
       "scheduler": { "classifyEnabled": true, "classifyCron": "*/10 * * * *" }
     },
     "defaults": { "…": "mesmo formato, mascarado — o que vale sem override" },

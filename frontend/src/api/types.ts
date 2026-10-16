@@ -42,7 +42,7 @@ export type Article = {
   ingestedAt: string;
   source: SourceRef;
   category: CategoryRef | null;
-  /** Origem da categoria: regra de keyword, IA (OpenRouter) ou null (padrao da fonte). */
+  /** Origem da categoria: regra de keyword, IA ou null (padrao da fonte). */
   categoryMethod: 'keyword' | 'ai' | null;
   /** Confianca da IA entre 0 e 1 (null quando nao foi a IA). */
   categoryConfidence: number | null;
