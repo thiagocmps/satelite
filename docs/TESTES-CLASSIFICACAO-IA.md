@@ -63,7 +63,7 @@ Nenhuma mudança de código. Tudo pelo menu gráfico de config da IA (tela
 | `fallbackProviders` | `["openrouter"]` | `[]` | Cadeia só-Groq; OpenRouter free está morto. |
 | `classify.concurrency` | `2` | `1` | Lotes sequenciais ficam sob o TPM de 8K/min. |
 | `providers.groq.fallbackModels` | `["openai/gpt-oss-20b"]` | `[]` | `gpt-oss-*` é reasoning: `content` volta vazio → "texto não utilizável". |
-| `classify.maxContentChars` | `800` | `500` | Estica o orçamento diário (TPD) ~40%; o título é a fonte primária da decisão, o texto é só apoio. |
+| `classify.maxContentChars` | `800` | `350` | Estica o orçamento diário (TPD) ~60%; o título é a fonte primária da decisão, o texto é só apoio. |
 
 Ajuste de consistência no `.env` (defaults para boots futuros — não entra no git):
 `AI_FALLBACK_PROVIDERS=` (vazio), `AI_CLASSIFY_CONCURRENCY=1`,
@@ -143,9 +143,9 @@ Verificação em banco: 0 fontes, 0 artigos órfãos.
 
 O teto agora é o **TPD de 200K tokens/dia** do Groq:
 
-- Lote de 8 artigos @ 500 chars ≈ ~2.400 tokens.
-- ~80 lotes/dia ≈ **~640 artigos/dia** por IA.
-- A fila de ~4.930 drena em **~7–8 dias**, depois acompanha a ingestão.
+- Lote de 8 artigos @ 350 chars ≈ ~2.100 tokens.
+- ~95 lotes/dia ≈ **~760 artigos/dia** por IA.
+- A fila de ~4.930 drena em **~6–7 dias**, depois acompanha a ingestão.
 
 Pontos que **não** são bug e sim limite do plano free:
 - O ciclo às vezes processa 1–2 lotes e para: bateu o TPD do dia, circuito aborta
@@ -156,8 +156,8 @@ Opções para acelerar (decisão do usuário):
 1. **Groq Dev Tier** (pago) — remove o TPD.
 2. **OpenRouter com US$ 10 de crédito** — destrava 1.000 req/dia de free models
    (reativar `fallbackProviders: ["openrouter"]` pela tela).
-3. Reduzir `classify.maxContentChars` (500 → 350) — ganha ~20% mais artigos/dia
-   ao custo de contexto por notícia.
+3. Reduzir `classify.maxContentChars` ainda mais (350 → 250) — ganha ~15% de
+   artigos/dia ao custo de contexto por notícia (título ainda decide).
 
 ## 6. Conclusão
 
@@ -168,5 +168,5 @@ Opções para acelerar (decisão do usuário):
 - **O circuito de aborto agora dispara** no TPD, parando a rodada em vez de
   martelar a API — comportamento correto de degradação.
 - **Resta o teto do plano free** (200K tokens/dia), que limita a vazão a
-  ~640 artigos/dia. A fila drena sozinha em ~1 semana; para mais velocidade,
+  ~760 artigos/dia. A fila drena sozinha em ~6 dias; para mais velocidade,
   só com plano pago ou crédito OpenRouter.
