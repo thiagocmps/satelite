@@ -1,11 +1,26 @@
 import { NotFoundError } from '../../core/errors.js';
+import { decodeEntities } from '../../core/html.js';
 import { fetchWithTimeout } from '../../core/http.js';
 import type { NewsRepository } from './news.repository.js';
 import type { NewsListQuery, Paginated, Article } from './news.types.js';
 
 /** Foto para o cartao de compartilhamento: stories nao precisam de mais que isso. */
 const PHOTO_MAX_BYTES = 4 * 1024 * 1024;
-const PHOTO_TIMEOUT_MS = 5000;
+const PHOTO_TIMEOUT_MS = 8000;
+
+/**
+ * CDNs de imagem de noticia (Globo, UOL etc) bloqueiam user-agents de bot:
+ * respondem 403 ou uma pagina HTML de captcha em vez da foto, e o cartao caia
+ * no placeholder mesmo com imagem disponivel ("as vezes nao sobe a foto").
+ * Aqui a busca de foto se passa por navegador de verdade; a coleta de feed
+ * continua com o UA de bot (educado fazer poll de RSS assim) — so a foto usa
+ * estes headers, porque vem de CDN de terceiro com hotlink/UA check.
+ */
+const PHOTO_HEADERS = {
+  'user-agent':
+    'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+};
 
 export type ArticlePhoto = { buffer: Buffer; contentType: string };
 
@@ -15,7 +30,11 @@ export type ArticlePhoto = { buffer: Buffer; contentType: string };
  * lido com um teto tambem.
  */
 async function fetchArticlePhoto(url: string): Promise<ArticlePhoto> {
-  const response = await fetchWithTimeout(url, { timeoutMs: PHOTO_TIMEOUT_MS, maxBytes: PHOTO_MAX_BYTES });
+  const response = await fetchWithTimeout(url, {
+    timeoutMs: PHOTO_TIMEOUT_MS,
+    maxBytes: PHOTO_MAX_BYTES,
+    headers: PHOTO_HEADERS,
+  });
   if (!response.ok || !response.body) throw new Error(`upstream status ${response.status}`);
 
   // so imagem interessa: um 200 com HTML (bloqueio, captcha) nao vira "foto"
@@ -69,7 +88,9 @@ export class NewsService {
 
     let remote: URL;
     try {
-      remote = new URL(article.imageUrl);
+      // image_url antigo pode estar gravado com entidade HTML do feed (&amp;),
+      // que invalida os query params e faz CDN estrito rejeitar — decodifica.
+      remote = new URL(decodeEntities(article.imageUrl));
     } catch {
       throw new NotFoundError('Imagem da noticia tem URL invalida');
     }

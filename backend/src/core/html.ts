@@ -70,11 +70,12 @@ export function stripHtml(input: string | null | undefined): string {
     .trim();
 }
 
-/** URL da primeira <img> encontrada no HTML. */
+/** URL da primeira <img> encontrada no HTML (entidades decodificadas: &amp; em URL quebra o fetch). */
 export function firstImageUrl(html: string | null | undefined): string | null {
   if (!html) return null;
   const match = /<img[^>]+src\s*=\s*["']([^"']+)["']/i.exec(html);
-  return match?.[1] ?? null;
+  const src = match?.[1];
+  return src ? decodeEntities(src) : null;
 }
 
 /** Corta o texto no limite, preferring cortar em fronteira de palavra. */

@@ -1374,23 +1374,50 @@ textarea {
   }
 }
 
-/* telas pequenas: filtros em uma coluna, tabelas viram cards, aside nao fica sticky */
+/* telas pequenas: filtros fluem em varias colunas (wrap) em vez de empilhar,
+   tabelas viram cards, aside nao fica sticky */
 @media (max-width: 640px) {
   .filters {
-    grid-template-columns: 1fr;
+    /* de grid de 1 coluna para flex-wrap: os campos quebram linha conforme
+       couberem, ocupando bem menos altura que um por linha */
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-3);
+    grid-template-columns: none;
   }
 
+  /* busca em largura cheia (placeholder longo) */
   .filters > *:first-child {
+    flex: 1 0 100%;
     grid-column: auto;
+  }
+
+  /* os demais campos: ~2 por linha, com piso pra nao espremer demais */
+  .filters .field {
+    flex: 1 1 calc(50% - var(--sp-3));
+    min-width: 132px;
   }
 
   .filters__actions {
+    flex: 1 0 100%;
     grid-column: auto;
-    width: 100%;
+    width: auto;
+    justify-content: space-between;
+  }
+
+  .filters__actions .field {
+    flex: 1 1 auto;
+    min-width: 132px;
   }
 
   .filters__actions .button {
-    flex: 1;
+    flex: 0 0 auto;
+  }
+
+  /* label mais enxuto para ganhar altura vertical */
+  .filters .field__label {
+    font-size: 0.74rem;
+    margin-bottom: 2px;
   }
 
   .detail__aside {

@@ -61,8 +61,9 @@ function loadPhoto(src: string | null): Promise<HTMLImageElement | null> {
     const done = (value: HTMLImageElement | null) => resolve(value);
     img.onload = () => done(img.naturalWidth > 0 ? img : null);
     img.onerror = () => done(null);
-    // resolucao tardia nao quebra o fluxo: vira placeholder
-    setTimeout(() => done(null), 6000);
+    // resolucao tardia nao quebra o fluxo: vira placeholder. Folga acima do
+    // timeout do proxy no backend (8s) para o frontend nao desistir antes.
+    setTimeout(() => done(null), 9000);
     img.src = src;
   });
 }

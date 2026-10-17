@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, ScrollRestoration } from 'react-router-dom';
 import { SatelliteIcon } from './SatelliteIcon';
 import { UpdateToast } from './UpdateToast';
 
@@ -13,6 +13,9 @@ const links = [
 export function Layout() {
   return (
     <div className="app">
+      {/* gerencia o scroll do data router: topo ao navegar, preserva ao voltar
+          e comportamento deterministico ao atualizar a pagina */}
+      <ScrollRestoration />
       <header className="site-header">
         <div className="container site-header__inner">
           <NavLink to="/" className="brand">
