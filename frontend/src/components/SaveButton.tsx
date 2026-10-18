@@ -55,8 +55,16 @@ export function SaveButton({ articleId }: { articleId: string }) {
     });
   }
 
+  // rastreia se o dialog ja esteve aberto: o foco no botao (devolucao a11y ao
+  // fechar) so acontece na transicao open true->false. Sem isso, a branch else
+  // roda tambem no MOUNT (open ja e false), cada SaveButton foca a si mesmo, o
+  // ultimo card rouba o foco (last-write-wins) e o browser rola a pagina ate
+  // ele — a pagina "pulinha" para o final ao atualizar.
+  const wasOpen = useRef(false);
+
   useEffect(() => {
     if (open) {
+      wasOpen.current = true;
       const dialog = dialogRef.current;
       if (dialog) dialog.focus();
       const handleKeyDown = (event: KeyboardEvent) => {
@@ -67,10 +75,12 @@ export function SaveButton({ articleId }: { articleId: string }) {
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    } else {
-      buttonRef.current?.focus();
-      return undefined;
     }
+    if (wasOpen.current) {
+      wasOpen.current = false;
+      buttonRef.current?.focus();
+    }
+    return undefined;
   }, [open]);
 
   return (
