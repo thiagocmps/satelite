@@ -1,3 +1,5 @@
+> Este app foi vibe-coded, utilizando opencode com seu modelo gratuito, Big Pickle 
+
 # satelite
 
 Agregador de notícias que coleta feeds RSS/Atom públicos, guarda tudo em PostgreSQL sem duplicar,
